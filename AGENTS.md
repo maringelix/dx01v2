@@ -12,8 +12,9 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
   cluster of `tx01v2`.
 - It must stay healthy without any cloud account: every claim is backed by the harness or carries a
   status label (`verified in CI`, `verified locally`, `not run in the cloud (v2)`, `planned`).
-- Current status: static, test, build and the kind e2e pass locally in Linux containers; the CI has
-  not run on GitHub yet. **Nothing of v2 has run in AWS** (`deploy-aws` is `not run in the cloud (v2)`).
+- Current status: static, test, build and the kind e2e pass locally in Linux containers and in CI
+  (jobs `static`, `test`, `images`, `e2e`). **Nothing of v2 has run in AWS** (`deploy-aws` is
+  `not run in the cloud (v2)`).
 - The interface with `tx01v2` is [docs/CONTRATO.md](docs/CONTRATO.md) (contract v1, owned by tx01v2).
 
 ## 2. Non-negotiable rules

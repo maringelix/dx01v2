@@ -22,6 +22,14 @@ updates:
       - dependency-name: '@types/node'
         update-types:
           - version-update:semver-major
+      # typescript-eslint 8.71 accepts typescript >=4.8.4 <6.1.0: a minor or major bump of
+      # typescript fails npm ci (ERESOLVE) and would block the whole minor/patch group. Patches
+      # still arrive; widen this by hand when typescript-eslint supports the new range
+      # (docs/SUSTENTACAO.md, section 4, quarterly review).
+      - dependency-name: typescript
+        update-types:
+          - version-update:semver-minor
+          - version-update:semver-major
 
   - package-ecosystem: docker
     directories:
@@ -37,6 +45,13 @@ updates:
         update-types:
           - minor
           - patch
+    ignore:
+      # The web image follows the nginx stable line (even minor, 1.30 now). A minor bump would move
+      # it to the mainline (odd, 1.31); patch and digest updates of the stable line still arrive.
+      # The next stable line (1.32, ~April 2027) is adopted by hand (docs/SUSTENTACAO.md, section 4).
+      - dependency-name: nginxinc/nginx-unprivileged
+        update-types:
+          - version-update:semver-minor
 
   - package-ecosystem: github-actions
     directory: /
