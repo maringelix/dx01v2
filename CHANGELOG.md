@@ -32,3 +32,12 @@ All notable changes to this project are documented here. The format follows
     ruleset and repository settings as code, Dependabot, issue and PR templates, devcontainer.
   - Brazilian Portuguese docs: architecture, API, contract v1 (app side), runbook, guardrails,
     harness, sustainment, publication checklist.
+
+### Changed
+
+- The CI (`static`, `test`, `images`, `e2e`) ran green on GitHub: the README status matrix now says
+  `verified in CI` for those rows (the compose row stays `verified locally`).
+- Dependabot ignores minor and major updates of `typescript` (typescript-eslint 8.71 accepts
+  `<6.1.0`; a TypeScript 7 PR failed `npm ci` with ERESOLVE) and minor updates of
+  `nginxinc/nginx-unprivileged` (they would move the web image from the stable to the mainline nginx
+  line). Both rules are reviewed in the quarterly routine (docs/SUSTENTACAO.md).

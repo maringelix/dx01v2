@@ -19,7 +19,7 @@ A família do lab (v2):
 
 | Repositório | Nuvem | Papel | Status |
 |---|---|---|---|
-| [`tx01v2`](https://github.com/maringelix/tx01v2) | AWS | infraestrutura (Terraform, EKS, RDS, camada de plataforma) | desenvolvido em paralelo |
+| [`tx01v2`](https://github.com/maringelix/tx01v2) | AWS | infraestrutura (Terraform, EKS, RDS, camada de plataforma) | veja a matriz de status dele |
 | `dx01v2` (este repositório) | AWS | aplicação (construída sobre o `docs/CONTRATO.md`) | ver matriz de status |
 | `tx02v2` / `dx02v2` | Azure | infraestrutura / aplicação | `planejado` |
 | `tx03v2` / `dx03v2` | GCP | infraestrutura / aplicação | `planejado` |
@@ -28,21 +28,21 @@ A família do lab (v2):
 
 | Capacidade | Status | Evidência |
 |---|---|---|
-| Lint, formatação e checagem de tipos (eslint, prettier, tsc para `api` e `web`) | `verificado localmente` | `make static` (`eslint`, `prettier`, `typecheck:*`); job `static` do CI |
-| Dockerfiles, workflows e scripts (hadolint, actionlint, shellcheck) | `verificado localmente` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
-| Manifests Kubernetes: render do kustomize + kubeconform estrito (local, aws, aws-https), asserções de contrato e de hardening, trivy config | `verificado localmente` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
-| Scan de segredos e políticas do repositório (sem identificadores reais, actions e imagens fixadas, regressões do v1) | `verificado localmente` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
-| Testes unitários + de integração da API contra um PostgreSQL 17 real (gate de cobertura: linhas >= 80 %, branches >= 70 %) | `verificado localmente` | `make test` (`test:api`); job `test` do CI |
-| Testes da página com Testing Library + jsdom (gate de cobertura: linhas >= 70 %) | `verificado localmente` | `make test` (`test:web`); job `test` do CI |
-| Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado localmente` | `make build`; job `images` do CI |
+| Lint, formatação e checagem de tipos (eslint, prettier, tsc para `api` e `web`) | `verificado no CI` | `make static` (`eslint`, `prettier`, `typecheck:*`); job `static` do CI |
+| Dockerfiles, workflows e scripts (hadolint, actionlint, shellcheck) | `verificado no CI` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
+| Manifests Kubernetes: render do kustomize + kubeconform estrito (local, aws, aws-https), asserções de contrato e de hardening, trivy config | `verificado no CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
+| Scan de segredos e políticas do repositório (sem identificadores reais, actions e imagens fixadas, regressões do v1) | `verificado no CI` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
+| Testes unitários + de integração da API contra um PostgreSQL 17 real (gate de cobertura: linhas >= 80 %, branches >= 70 %) | `verificado no CI` | `make test` (`test:api`); job `test` do CI |
+| Testes da página com Testing Library + jsdom (gate de cobertura: linhas >= 70 %) | `verificado no CI` | `make test` (`test:web`); job `test` do CI |
+| Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado no CI` | `make build`; job `images` do CI |
 | Stack do compose (PostgreSQL → migrate → api → web em 127.0.0.1) + smoke test | `verificado localmente` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, fora do CI) |
-| Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado localmente` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
+| Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado no CI` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
 | Deploy na AWS (push no ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, smoke test pelo ALB) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Configurações do repositório como código (ruleset, environment `lab`) | `planejado` | `scripts/repo-guardrails.sh`, `docs/PUBLICACAO.md` |
 
-`verificado localmente` vira `verificado no CI` quando o CI rodar no GitHub (a linha do compose
-continua local). A linha da AWS só muda com uma issue `cloud_run_report` (data, região, commits,
-custo, saída do smoke test, sobras).
+As linhas `verificado no CI` rodam em todo pull request, em todo push para a `main` e toda semana
+(jobs do CI na coluna Evidência); a linha do compose é verificada só localmente. A linha da AWS só
+muda com uma issue `cloud_run_report` (data, região, commits, custo, saída do smoke test, sobras).
 
 ## Arquitetura
 

@@ -34,11 +34,11 @@ os scripts e workflows, as ferramentas do harness e as rodadas opcionais em nuve
 |---|---|---|---|---|
 | Node.js | 24 (`.nvmrc`; imagens com 24.21.0) | 2028-04-30 | [calendário do Node.js](https://github.com/nodejs/Release#release-schedule) | Migrar para o 26 (seção 5.3) com folga, depois de ele virar LTS |
 | Node.js | 26 | LTS a partir de 2026-10-28; fim em 2029-04-30 | idem | Candidato na primeira revisão trimestral depois de 2026-10-28 (imagens distroless e alpine precisam existir) |
-| TypeScript | 6.0.3 | sem data publicada | [typescript-eslint: versões suportadas](https://typescript-eslint.io/users/dependency-versions) | Manter dentro de `>=4.8.4 <6.1.0` (typescript-eslint 8.71); o TypeScript 7 só entra quando o typescript-eslint suportar |
+| TypeScript | 6.0.3 | sem data publicada | [typescript-eslint: versões suportadas](https://typescript-eslint.io/users/dependency-versions) | Manter dentro de `>=4.8.4 <6.1.0` (typescript-eslint 8.71); o TypeScript 7 só entra quando o typescript-eslint suportar. O `dependabot.yml` ignora minors e majors do `typescript` (só patches chegam); revisar a regra na revisão trimestral |
 | React / Vite / Vitest | 19.3 / 8.3 / 5.0 | sem calendário publicado; correções vão para a major atual | react.dev, vite.dev, vitest.dev | Majors chegam como PRs individuais do Dependabot; ler o guia de migração |
 | Express | 5.3 | linha 5.x ativa | [política de suporte do Express](https://expressjs.com/en/support/) | Acompanhar pelo Dependabot |
 | PostgreSQL | 17 (`postgres:17-alpine`, imagem com 17.11) | 2029-11-08 (comunidade) | [versionamento do PostgreSQL](https://www.postgresql.org/support/versioning/) | A major segue o RDS do tx01v2 (contrato); trocar compose, CI, kind e harness juntos |
-| nginx (web) | 1.30 estável (`nginxinc/nginx-unprivileged:1.30.5-alpine3.24-slim`) | a linha estável recebe correções até a próxima estável (1.32, prevista para ~abril de 2027) | [nginx.org](https://nginx.org/en/download.html) | Mudar para a nova linha estável (minor par) na revisão trimestral seguinte ao lançamento |
+| nginx (web) | 1.30 estável (`nginxinc/nginx-unprivileged:1.30.5-alpine3.24-slim`) | a linha estável recebe correções até a próxima estável (1.32, prevista para ~abril de 2027) | [nginx.org](https://nginx.org/en/download.html) | Mudar para a nova linha estável (minor par) na revisão trimestral seguinte ao lançamento. O `dependabot.yml` ignora minors do `nginx-unprivileged`, que levariam à linha mainline (ímpar) |
 | Alpine (build e runtime do web) | 3.24 | ~2028-05 (cada versão tem ~2 anos de suporte) | [releases do Alpine](https://alpinelinux.org/releases/) | Acompanha os digests do node e do nginx-unprivileged |
 | Distroless (runtime da API) | `nodejs24-debian13:nonroot` | segue o Debian 13 (segurança até ~2028-08) e o Node.js 24 | [distroless](https://github.com/GoogleContainerTools/distroless) | A variante `debian12` parou no Node.js 24.14.0 (verificado em 2026-10-10): não voltar para ela |
 | Kubernetes (kind, kubectl, schemas) | 1.36 (nó `v1.36.4`, kubectl 1.36.5) | upstream: ~2027-06 (cerca de 14 meses após o lançamento); EKS padrão: 2027-08-02 | [releases do Kubernetes](https://kubernetes.io/releases/), [calendário do EKS](https://docs.aws.amazon.com/eks/latest/userguide/kubernetes-versions.html) | Mudar junto com o tx01v2 (mudança de minor é mudança de contrato), seção 5.5 |
@@ -69,8 +69,11 @@ npm install --save-exact --workspace api express@5.3.1   # ou --workspace web, o
 HARNESS_STRICT=1 make verify build && make e2e
 ```
 
-Restrições: `typescript` dentro da faixa do `typescript-eslint`; `@types/node` na major do Node.js de
-`.nvmrc` (o Dependabot ignora majors dele); `@vitejs/plugin-react` compatível com a major do Vite.
+Restrições: `typescript` dentro da faixa do `typescript-eslint` (o Dependabot ignora minors e majors
+dele); `@types/node` na major do Node.js de `.nvmrc` (o Dependabot ignora majors dele);
+`@vitejs/plugin-react` compatível com a major do Vite. Um PR do Dependabot que quebra uma dessas
+restrições falha no `npm ci` (ERESOLVE) e deve ser fechado com um comentário, nunca forçado com
+`--legacy-peer-deps`.
 
 ### 5.3 Major do Node.js (por exemplo 24 → 26)
 
