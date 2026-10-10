@@ -18,7 +18,7 @@ RUN npm run build --workspace web
 # 2026-10-10). The slim variant ships nginx without the image-filter/xslt/geoip/njs modules and their
 # libraries (libgd, libtiff, libxslt), which this config does not use: the regular 1.30-alpine image
 # failed the trivy gate with a fixable HIGH in libtiff (CVE-2026-4775).
-FROM nginxinc/nginx-unprivileged:1.30-alpine-slim@sha256:3af0c10d960cc2502427fe1219c52989d309e7d65596869c60a34fd2fa2406f0 AS runtime
+FROM nginxinc/nginx-unprivileged:1.31-alpine-slim@sha256:1517d8c358e2e093957ebee087afa9eb19a32f5d7ecb711b7429e369cb998224 AS runtime
 ARG GIT_SHA=unknown
 LABEL org.opencontainers.image.title="dx01v2-web" \
       org.opencontainers.image.description="dx01v2 message board single page served by nginx-unprivileged" \
