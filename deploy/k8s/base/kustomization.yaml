@@ -1,0 +1,19 @@
+# Environment-neutral manifests of the dx01v2 app (namespace-scoped only). Overlays:
+#   overlays/local      kind: namespace, PostgreSQL StatefulSet, local images
+#   overlays/aws        EKS (tx01v2): Ingress, ExternalSecrets, HPA, VPC-CIDR policies, ECR images
+#   overlays/aws-https  same as aws plus the HTTPS listener (ACM certificate)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: dx01v2
+    includeSelectors: false
+    includeTemplates: true
+resources:
+  - serviceaccounts.yaml
+  - configmap.yaml
+  - api.yaml
+  - web.yaml
+  - services.yaml
+  - pdb.yaml
+  - networkpolicies.yaml

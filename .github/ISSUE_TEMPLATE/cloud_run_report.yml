@@ -1,0 +1,78 @@
+name: Cloud run report
+description: I deployed this app in my own AWS account (with tx01v2). Share what happened so the status matrix stays honest.
+title: 'cloud run: <date> <region>'
+labels:
+  - cloud-run
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Follow docs/RUNBOOK.md (and the tx01v2 runbook for the infrastructure). Redact account IDs,
+        IPs, e-mails, ARNs and the ALB hostname (use `<ACCOUNT_ID>`). A report counts as evidence only
+        with the commit SHAs, the smoke test output and the leftover check result.
+  - type: input
+    id: date
+    attributes:
+      label: Date (UTC)
+      placeholder: '2026-10-10'
+    validations:
+      required: true
+  - type: input
+    id: region
+    attributes:
+      label: AWS region
+      placeholder: us-east-1
+    validations:
+      required: true
+  - type: textarea
+    id: versions
+    attributes:
+      label: Versions and commit
+      description: dx01v2 and tx01v2 commit SHAs, Kubernetes version, image tags, overlay (aws or aws-https).
+    validations:
+      required: true
+  - type: checkboxes
+    id: steps
+    attributes:
+      label: Steps executed
+      options:
+        - label: tx01v2 bootstrap, apply and platform (see the tx01v2 report)
+        - label: GitHub variables of dx01v2 (AWS_REGION, AWS_DEPLOY_ROLE_ARN)
+        - label: deploy-aws workflow (or scripts/deploy-aws.sh from a laptop)
+        - label: images pushed to ECR (dx01v2/api, dx01v2/web)
+        - label: ExternalSecrets synced, rollouts complete
+        - label: smoke test through the ALB passed
+        - label: tx01v2 destroy + scripts/leftovers.sh
+  - type: input
+    id: duration
+    attributes:
+      label: Total duration (deploy to destroy)
+      placeholder: 1h10m
+    validations:
+      required: true
+  - type: input
+    id: cost
+    attributes:
+      label: Observed cost (AWS Cost Explorer or Billing, USD)
+      placeholder: '1.20'
+    validations:
+      required: true
+  - type: textarea
+    id: smoke
+    attributes:
+      label: Smoke test output
+      description: PASS/FAIL lines printed by e2e/smoke.mjs (no tokens are printed).
+    validations:
+      required: true
+  - type: textarea
+    id: problems
+    attributes:
+      label: Problems and workarounds
+      description: Errors, retries, manual fixes (redacted logs welcome).
+  - type: textarea
+    id: leftovers
+    attributes:
+      label: Leftovers after destroy
+      description: Output of the tx01v2 `scripts/leftovers.sh` (redacted) and anything you had to delete by hand.
+    validations:
+      required: true

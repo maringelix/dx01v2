@@ -1,0 +1,15 @@
+# Generated or vendored
+node_modules/
+dist/
+coverage/
+.tools/
+.cache/
+package-lock.json
+
+# Hand-formatted: docs (wide tables), nginx config, SQL, shell (shellcheck covers it)
+*.md
+*.conf
+*.sql
+*.sh
+Makefile
+.env*

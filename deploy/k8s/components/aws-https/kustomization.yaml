@@ -1,0 +1,33 @@
+# Optional HTTPS listener (contract v1: only when an ACM certificate ARN is supplied). Use after
+# components/aws, which provides the deploy-params ConfigMap (ALB_CERTIFICATE_ARN). HTTP 80
+# redirects to 443; behind HTTPS the web nginx starts sending HSTS (X-Forwarded-Proto: https).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+patches:
+  - target:
+      kind: Ingress
+      name: dx01v2
+    patch: |-
+      - op: replace
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1listen-ports
+        value: '[{"HTTP": 80}, {"HTTPS": 443}]'
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1ssl-redirect
+        value: '443'
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1ssl-policy
+        value: ELBSecurityPolicy-TLS13-1-2-2021-06
+      - op: add
+        path: /metadata/annotations/alb.ingress.kubernetes.io~1certificate-arn
+        value: replaced-from-deploy-params
+replacements:
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.ALB_CERTIFICATE_ARN
+    targets:
+      - select:
+          kind: Ingress
+          name: dx01v2
+        fieldPaths:
+          - metadata.annotations.[alb.ingress.kubernetes.io/certificate-arn]

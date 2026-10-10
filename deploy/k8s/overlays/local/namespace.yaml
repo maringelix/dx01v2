@@ -1,0 +1,10 @@
+# Same labels as the namespace tx01v2 creates on EKS (contract v1), minus the ALB readiness gate.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: dx01v2
+  labels:
+    pod-security.kubernetes.io/enforce: restricted
+    pod-security.kubernetes.io/enforce-version: latest
+    pod-security.kubernetes.io/warn: restricted
+    pod-security.kubernetes.io/warn-version: latest

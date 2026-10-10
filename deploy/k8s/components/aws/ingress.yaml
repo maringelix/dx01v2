@@ -1,0 +1,33 @@
+# Contract v1: AWS Load Balancer Controller, class alb, internet-facing, target-type ip, HTTP 80,
+# WAF web ACL from SSM (/tx01v2/lab/waf/acl-arn). /api goes straight to the API, / to the web.
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: dx01v2
+  labels:
+    app.kubernetes.io/name: dx01v2
+  annotations:
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}]'
+    alb.ingress.kubernetes.io/wafv2-acl-arn: replaced-from-deploy-params
+    alb.ingress.kubernetes.io/load-balancer-attributes: routing.http.drop_invalid_header_fields.enabled=true,idle_timeout.timeout_seconds=60
+spec:
+  ingressClassName: alb
+  rules:
+    - http:
+        paths:
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: api
+                port:
+                  number: 3000
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web
+                port:
+                  number: 8080

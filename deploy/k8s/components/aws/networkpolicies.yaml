@@ -1,0 +1,53 @@
+# AWS edges on top of the base policies (enforced by the VPC CNI network policy agent):
+# the ALB (target-type ip) reaches the pods from inside the VPC, the API reaches RDS in the VPC.
+# The CIDR comes from SSM (/tx01v2/lab/vpc-cidr) through deploy-params.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: web-ingress-from-alb
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-ingress-from-alb
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 3000
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress-to-rds
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - ipBlock:
+            cidr: 192.0.2.0/24
+      ports:
+        - protocol: TCP
+          port: 5432

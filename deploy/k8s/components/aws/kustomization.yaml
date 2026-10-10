@@ -1,0 +1,133 @@
+# EKS (tx01v2, contract v1). Namespace-scoped resources only: the dx01v2 namespace, the
+# ClusterSecretStore and the deployer RBAC belong to tx01v2. Values read from SSM at deploy time
+# (image URLs, WAF ARN, VPC CIDR) arrive through params.env (gitignored, written by
+# scripts/deploy-aws.sh into a temporary copy of deploy/k8s; params.example.env is what CI
+# renders) and are injected with replacements. Not applied in the cloud yet (v2).
+apiVersion: kustomize.config.k8s.io/v1alpha1
+kind: Component
+resources:
+  - ingress.yaml
+  - externalsecrets.yaml
+  - hpa.yaml
+  - networkpolicies.yaml
+configMapGenerator:
+  - name: deploy-params
+    envs:
+      - params.env
+    options:
+      disableNameSuffixHash: true
+      annotations:
+        # Input of the replacements below; kustomize drops it from the output.
+        config.kubernetes.io/local-config: 'true'
+patches:
+  - target:
+      kind: ConfigMap
+      name: app-config
+    patch: |-
+      - op: add
+        path: /data/APP_ENV
+        value: lab
+      - op: add
+        path: /data/DB_SSL_MODE
+        value: verify-full
+      - op: add
+        path: /data/DB_SSL_CA_FILE
+        value: /etc/rds-ca/ca.pem
+  # The HPA owns the replica count (2-4); keeping spec.replicas would reset it on every deploy.
+  - target:
+      kind: Deployment
+      name: api
+    patch: |-
+      - op: remove
+        path: /spec/replicas
+      - op: add
+        path: /spec/template/spec/volumes
+        value:
+          - name: rds-ca
+            configMap:
+              name: rds-ca
+      - op: add
+        path: /spec/template/spec/initContainers/0/volumeMounts
+        value:
+          - name: rds-ca
+            mountPath: /etc/rds-ca
+            readOnly: true
+      - op: add
+        path: /spec/template/spec/containers/0/volumeMounts
+        value:
+          - name: rds-ca
+            mountPath: /etc/rds-ca
+            readOnly: true
+  # ALB target group health checks (target-type ip): web /healthz, api /readyz.
+  - target:
+      kind: Service
+      name: api
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          alb.ingress.kubernetes.io/healthcheck-path: /readyz
+          alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+          alb.ingress.kubernetes.io/success-codes: '200'
+  - target:
+      kind: Service
+      name: web
+    patch: |-
+      - op: add
+        path: /metadata/annotations
+        value:
+          alb.ingress.kubernetes.io/healthcheck-path: /healthz
+          alb.ingress.kubernetes.io/healthcheck-port: traffic-port
+          alb.ingress.kubernetes.io/success-codes: '200'
+replacements:
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.API_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: api
+        fieldPaths:
+          - spec.template.spec.initContainers.[name=migrate].image
+          - spec.template.spec.containers.[name=api].image
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.WEB_IMAGE
+    targets:
+      - select:
+          kind: Deployment
+          name: web
+        fieldPaths:
+          - spec.template.spec.containers.[name=web].image
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.WAF_ACL_ARN
+    targets:
+      - select:
+          kind: Ingress
+          name: dx01v2
+        fieldPaths:
+          - metadata.annotations.[alb.ingress.kubernetes.io/wafv2-acl-arn]
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.VPC_CIDR
+    targets:
+      - select:
+          kind: NetworkPolicy
+          name: web-ingress-from-alb
+        fieldPaths:
+          - spec.ingress.0.from.0.ipBlock.cidr
+      - select:
+          kind: NetworkPolicy
+          name: api-ingress-from-alb
+        fieldPaths:
+          - spec.ingress.0.from.0.ipBlock.cidr
+      - select:
+          kind: NetworkPolicy
+          name: api-egress-to-rds
+        fieldPaths:
+          - spec.egress.0.to.0.ipBlock.cidr
