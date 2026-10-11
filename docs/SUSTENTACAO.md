@@ -23,7 +23,7 @@ os scripts e workflows, as ferramentas do harness e as rodadas opcionais em nuve
 |---|---|---|
 | Semanal (automático) | CI agendado (segunda 06:00 UTC) roda todos os jobs, inclusive o trivy das imagens | Falhou? Seção 6. Causas típicas: CVE novo numa imagem base ou dependência, URL que mudou, rede |
 | Mensal | PRs do Dependabot (npm, Docker, actions, pre-commit) | Playbook "Dependency updater" do `AGENTS.md`; um PR por grupo, CI verde antes do merge |
-| Trimestral | Ferramentas do harness, digests das imagens (incluindo PostgreSQL, kind e devcontainer), versões de plataforma (Node.js, nginx, Kubernetes), schemas do kubeconform, ignores perto de vencer | Seções 4 e 5; registre no CHANGELOG |
+| Trimestral | Ferramentas do harness, digests das imagens (incluindo PostgreSQL, kind e devcontainer), versões de plataforma (Node.js, nginx, Kubernetes), schemas do kubeconform, ignores perto de vencer; paridade do app com o `dx02v2` (`api/` e `web/` iguais, fora os nomes; `e2e/` só difere no que a borda muda) | Seções 4 e 5; registre no CHANGELOG |
 | Por rodada em nuvem: antes | Ler o custo no tx01v2 (`docs/CUSTOS.md` de lá), CI verde no commit, tx01v2 aplicado e com a plataforma instalada, variáveis do GitHub | `docs/RUNBOOK.md` |
 | Por rodada em nuvem: durante | Anotar horários, saída do smoke test e problemas; não deixar a rodada aberta de um dia para o outro | `docs/RUNBOOK.md` |
 | Por rodada em nuvem: depois | destroy do tx01v2, `scripts/leftovers.sh` limpo, issue `cloud_run_report`, matriz de status só com evidência | `docs/RUNBOOK.md`, seção 7 |

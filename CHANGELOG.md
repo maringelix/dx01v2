@@ -41,3 +41,8 @@ All notable changes to this project are documented here. The format follows
   `<6.1.0`; a TypeScript 7 PR failed `npm ci` with ERESOLVE) and minor updates of
   `nginxinc/nginx-unprivileged` (they would move the web image from the stable to the mainline nginx
   line). Both rules are reviewed in the quarterly routine (docs/SUSTENTACAO.md).
+- The README family table links the Azure pair (`tx02v2`, `dx02v2`), now public; `dx02v2` runs this
+  same application. AGENTS.md (rule 8) and docs/SUSTENTACAO.md (quarterly routine) add the parity
+  rule between the app repositories.
+- One integration test case more, ported from `dx02v2` for parity: the comma-only
+  `X-Forwarded-For` format of Application Gateway for Containers (`api/test/integration/rate-limit.test.ts`).

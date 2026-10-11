@@ -62,6 +62,22 @@ describe('write rate limit', () => {
     expect(other.status).toBe(201);
   });
 
+  it('reads the client from the comma-only X-Forwarded-For of Application Gateway for Containers', async () => {
+    // AGC appends the address it received the request from, comma delimited without a space
+    // (docs "Application Gateway for Containers components", checked 2026-10-11). Kept identical
+    // to dx02v2, which runs this same app behind AGC (parity routine, docs/SUSTENTACAO.md).
+    const t = app('1');
+    const statuses: number[] = [];
+    for (let i = 1; i <= LIMIT + 1; i++) {
+      const res = await request(t.app)
+        .post('/api/messages')
+        .set('X-Forwarded-For', `198.51.100.${i},203.0.113.9`)
+        .send({ author: 'Ana', text: `agc ${i}` });
+      statuses.push(res.status);
+    }
+    expect(statuses).toEqual([201, 201, 201, 429]);
+  });
+
   it('counts rejected writes too (the limiter runs before validation)', async () => {
     const t = app('1');
     const statuses: number[] = [];
