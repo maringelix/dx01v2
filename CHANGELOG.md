@@ -46,3 +46,11 @@ All notable changes to this project are documented here. The format follows
   rule between the app repositories.
 - One integration test case more, ported from `dx02v2` for parity: the comma-only
   `X-Forwarded-For` format of Application Gateway for Containers (`api/test/integration/rate-limit.test.ts`).
+- The README family table and AGENTS.md link the Google Cloud pair (`tx03v2`, `dx03v2`), now public;
+  `dx03v2` runs this same application (AGENTS.md rule 8 and the quarterly parity routine name it).
+- One integration test case more, ported from `dx03v2` for parity: the
+  `[<supplied>,]<client-ip>,<lb-ip>` `X-Forwarded-For` of the Google Cloud Application Load Balancer
+  with `TRUST_PROXY_HOPS=2` (`api/test/integration/rate-limit.test.ts`).
+- Dependabot ignores major bumps of the `node` build image (it follows `.nvmrc` and `engines.node`;
+  a `node:26` bump fails `npm ci` with EBADENGINE).
+- docs/SUSTENTACAO.md, "Estado atual": the stages say `verificado no CI` (the README already did).

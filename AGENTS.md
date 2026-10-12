@@ -6,7 +6,7 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
 ## 1. Mission and context
 
 - `dx01v2` is the application half of a public, educational DevOps lab (v2 family: `tx01v2` +
-  `dx01v2` on AWS, `tx02v2` + `dx02v2` on Azure; `tx03v2`/`dx03v2` on GCP are planned). Every app
+  `dx01v2` on AWS, `tx02v2` + `dx02v2` on Azure, `tx03v2` + `dx03v2` on Google Cloud). Every app
   repository of the family runs this same application; only the deploy target changes.
 - The app is a small message board: Express 5 + TypeScript API, React 19 page served by
   nginx-unprivileged, PostgreSQL 17; Kubernetes manifests (kustomize) for kind and for the EKS
@@ -35,9 +35,10 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
 6. Pin every new dependency, action and image (exact npm version + lockfile, 40-char SHA +
    `# vX.Y.Z`, image digest, tool version + SHA256) and update the docs in the same change.
 7. Once the ruleset is on, never push to `main`: pull requests only.
-8. Keep parity with the other app repositories (`dx02v2` now): a change to `api/` or `web/` is
-   ported to all of them, or the PR says why it is AWS-only; `e2e/` differs only where the edge
-   differs (ALB + WAF here, Application Gateway for Containers in dx02v2).
+8. Keep parity with the other app repositories (`dx02v2` and `dx03v2`): a change to `api/` or
+   `web/` is ported to all of them, or the PR says why it is AWS-only; `e2e/` differs only where the
+   edge differs (ALB + WAF here, Application Gateway for Containers in dx02v2, the GKE Gateway with
+   Cloud Armor in dx03v2).
 
 ## 3. Repo map
 
