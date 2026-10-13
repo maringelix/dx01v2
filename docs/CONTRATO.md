@@ -101,6 +101,16 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 - RDS PostgreSQL 17, porta 5432, acessível só a partir do security group do cluster EKS,
   `rds.force_ssl = 1`.
 
+## Lab local (contrato local do tx01v2, versão 1)
+
+O deploy local (scripts/deploy-local.sh, docs/LAB_LOCAL.md) lê o ConfigMap `lab-system/lab-contract`
+da plataforma local do tx01v2 e recusa valores diferentes dos fixados no overlay `local-platform`:`registry` = `registry.tx01v2.local`, `db.secret-name` = `tx01v2-lab-db-app`,
+`app.admin-token-secret-name` = `tx01v2-lab-app-admin-token`, `eso.cluster-secret-store` =
+`local-secrets`, `gateway.class` = `istio`, `tls.cluster-issuer` = `lab-ca`, `argocd.project` = `dx01v2`,
+`monitoring.prometheus-service-account` = `monitoring/kube-prometheus-stack-prometheus`. Do contrato ele
+lê ainda `registry-push`, `network-cidr`, `db.endpoint-ip`, `db.ca-configmap`, `gitops.push-url`,
+`gitops.read-url` e `gitops.push-key-secret`. A fonte da verdade é o `docs/CONTRATO.md` do tx01v2.
+
 ## Mudando o contrato
 
 1. Abra PRs nos dois repositórios, com links cruzados, e incremente a versão no título dos dois

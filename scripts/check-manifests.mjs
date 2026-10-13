@@ -50,9 +50,12 @@ const eq = (actual, expected, message) =>
 function parseArgs(argv) {
   const files = {};
   let params;
+  let localParams;
   for (let i = 0; i < argv.length; i++) {
     if (argv[i] === '--params') {
       params = argv[++i];
+    } else if (argv[i] === '--local-params') {
+      localParams = argv[++i];
     } else {
       const [name, file] = argv[i].split('=');
       files[name] = file;
@@ -62,7 +65,11 @@ function parseArgs(argv) {
     console.error('usage: node scripts/check-manifests.mjs --params <params.env> <overlay>=<rendered.yaml>...');
     process.exit(2);
   }
-  return { params: readParams(params), files };
+  return {
+    params: readParams(params),
+    files,
+    localParams: localParams === undefined ? undefined : readParams(localParams),
+  };
 }
 
 function readParams(file) {
@@ -388,7 +395,157 @@ function awsChecks(overlay, objs, params, https) {
   }
 }
 
-const { params, files } = parseArgs(process.argv.slice(2));
+// Kinds the AppProject dx01v2 of the tx01v2 local lab lets Argo CD sync (local contract).
+const APPPROJECT_KINDS = new Set([
+  ...DEPLOYER_KINDS,
+  'Gateway',
+  'HTTPRoute',
+  'PeerAuthentication',
+  'AuthorizationPolicy',
+  'ServiceMonitor',
+  'PrometheusRule',
+]);
+APPPROJECT_KINDS.delete('Ingress');
+
+function localPlatformChecks(objs, params) {
+  const overlay = 'local-platform';
+  for (const o of objs) {
+    check(APPPROJECT_KINDS.has(o.kind), `${overlay}: ${o.kind} is outside what the AppProject dx01v2 may sync`);
+  }
+  const config = find(objs, 'ConfigMap', 'app-config')?.data ?? {};
+  eq(
+    [config.APP_ENV, config.DB_SSL_MODE, config.DB_SSL_CA_FILE, config.TRUST_PROXY_HOPS],
+    ['lab', 'verify-full', '/etc/lab-ca/ca.crt', '1'],
+    `${overlay}: app-config`,
+  );
+  const api = find(objs, 'Deployment', 'api');
+  const pod = api?.spec?.template?.spec ?? {};
+  check(api?.spec?.replicas === undefined, `${overlay}: api replicas must be left to the HPA`);
+  eq(pod.volumes, [{ name: 'lab-ca', configMap: { name: 'lab-ca' } }], `${overlay}: lab-ca volume`);
+  for (const c of [...(pod.initContainers ?? []), ...(pod.containers ?? [])]) {
+    eq(
+      c.volumeMounts,
+      [{ name: 'lab-ca', mountPath: '/etc/lab-ca', readOnly: true }],
+      `${overlay}: ${c.name} mounts lab-ca`,
+    );
+    eq(c.image, params.API_IMAGE, `${overlay}: ${c.name} image from params`);
+  }
+  eq(
+    find(objs, 'Deployment', 'web')?.spec?.template?.spec?.containers?.[0]?.image,
+    params.WEB_IMAGE,
+    `${overlay}: web image from params`,
+  );
+
+  const gw = find(objs, 'Gateway', 'dx01v2');
+  eq(gw?.spec?.gatewayClassName, 'istio', `${overlay}: Gateway class`);
+  eq(gw?.metadata?.annotations?.['cert-manager.io/cluster-issuer'], 'lab-ca', `${overlay}: Gateway issuer`);
+  eq(
+    (gw?.spec?.listeners ?? []).map((l) => [l.name, l.protocol, l.port, l.hostname, l.tls?.certificateRefs?.[0]?.name]),
+    [
+      ['http', 'HTTP', 80, 'dx01v2.tx01v2.local', undefined],
+      ['https', 'HTTPS', 443, 'dx01v2.tx01v2.local', 'dx01v2-tls'],
+    ],
+    `${overlay}: Gateway listeners`,
+  );
+  const redirect = find(objs, 'HTTPRoute', 'dx01v2-redirect')?.spec;
+  eq(redirect?.parentRefs?.[0]?.sectionName, 'http', `${overlay}: redirect on the http listener`);
+  eq(
+    redirect?.rules?.[0]?.filters?.[0]?.requestRedirect,
+    { scheme: 'https', statusCode: 301 },
+    `${overlay}: HTTP -> HTTPS redirect`,
+  );
+  const route = find(objs, 'HTTPRoute', 'dx01v2')?.spec;
+  eq(route?.parentRefs?.[0]?.sectionName, 'https', `${overlay}: app routes on the https listener only`);
+  eq(
+    (route?.rules ?? []).map((r) => [r.matches?.[0]?.path?.value, r.backendRefs?.[0]?.name, r.backendRefs?.[0]?.port]),
+    [
+      ['/api', 'api', 3000],
+      ['/', 'web', 8080],
+    ],
+    `${overlay}: HTTPRoute rules`,
+  );
+
+  const db = find(objs, 'ExternalSecret', 'db-credentials')?.spec;
+  eq(db?.secretStoreRef, { kind: 'ClusterSecretStore', name: 'local-secrets' }, `${overlay}: db-credentials store`);
+  eq(
+    (db?.data ?? []).map((d) => [d.secretKey, d.remoteRef?.key, d.remoteRef?.property]),
+    [
+      ['DB_HOST', 'tx01v2-lab-db-app', 'host'],
+      ['DB_PORT', 'tx01v2-lab-db-app', 'port'],
+      ['DB_NAME', 'tx01v2-lab-db-app', 'dbname'],
+      ['DB_USER', 'tx01v2-lab-db-app', 'username'],
+      ['DB_PASSWORD', 'tx01v2-lab-db-app', 'password'],
+    ],
+    `${overlay}: db-credentials mapping`,
+  );
+  const app = find(objs, 'ExternalSecret', 'app-secrets')?.spec;
+  eq(
+    (app?.data ?? []).map((d) => [d.secretKey, d.remoteRef?.key, d.remoteRef?.property]),
+    [['ADMIN_TOKEN', 'tx01v2-lab-app-admin-token', 'token']],
+    `${overlay}: app-secrets mapping`,
+  );
+
+  eq(find(objs, 'PeerAuthentication', 'default')?.spec?.mtls?.mode, 'STRICT', `${overlay}: mTLS STRICT`);
+  const principals = (name) =>
+    (find(objs, 'AuthorizationPolicy', name)?.spec?.rules ?? []).map((r) => [
+      r.from?.[0]?.source?.principals,
+      r.to?.[0]?.operation?.ports,
+    ]);
+  eq(
+    principals('api'),
+    [
+      [['cluster.local/ns/dx01v2/sa/web', 'cluster.local/ns/dx01v2/sa/dx01v2-istio'], ['3000']],
+      [['cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus'], ['9464']],
+    ],
+    `${overlay}: AuthorizationPolicy api`,
+  );
+  eq(
+    principals('web'),
+    [[['cluster.local/ns/dx01v2/sa/dx01v2-istio'], ['8080']]],
+    `${overlay}: AuthorizationPolicy web`,
+  );
+
+  eq(
+    find(objs, 'NetworkPolicy', 'gateway-ingress-from-load-balancer')?.spec?.ingress?.[0]?.from?.[0]?.ipBlock?.cidr,
+    params.NETWORK_CIDR,
+    `${overlay}: Gateway ingress only from the lab network`,
+  );
+  eq(
+    find(objs, 'NetworkPolicy', 'api-egress-to-db')?.spec?.egress?.[0],
+    { to: [{ ipBlock: { cidr: params.DB_ENDPOINT_CIDR } }], ports: [{ protocol: 'TCP', port: 5432 }] },
+    `${overlay}: api -> database only`,
+  );
+  for (const name of ['api-ingress-mesh', 'web-ingress-mesh']) {
+    const rules = find(objs, 'NetworkPolicy', name)?.spec?.ingress ?? [];
+    check(
+      rules.some((r) => (r.ports ?? []).some((p) => p.port === 15008)),
+      `${overlay}: ${name} must allow HBONE (15008)`,
+    );
+    check(
+      rules.some((r) => r.from?.[0]?.ipBlock?.cidr === '169.254.7.127/32'),
+      `${overlay}: ${name} must allow the ambient kubelet probes (169.254.7.127/32)`,
+    );
+  }
+  eq(
+    find(objs, 'ServiceMonitor', 'api')?.spec?.endpoints?.[0]?.port,
+    'metrics',
+    `${overlay}: ServiceMonitor scrapes the metrics port`,
+  );
+  eq(
+    (find(objs, 'PrometheusRule', 'dx01v2')?.spec?.groups?.[0]?.rules ?? []).map((r) => r.alert),
+    ['Dx01v2ApiDown', 'Dx01v2HighErrorRate', 'Dx01v2HighLatencyP95', 'Dx01v2PodRestarting', 'Dx01v2PodNotReady'],
+    `${overlay}: alert rules`,
+  );
+  eq(
+    find(objs, 'ConfigMap', 'dx01v2-dashboard')?.metadata?.labels?.grafana_dashboard,
+    '1',
+    `${overlay}: dashboard ConfigMap for the Grafana sidecar`,
+  );
+  const hpa = find(objs, 'HorizontalPodAutoscaler', 'api')?.spec;
+  eq([hpa?.minReplicas, hpa?.maxReplicas], [2, 4], `${overlay}: HPA`);
+}
+
+const { params, files, localParams } = parseArgs(process.argv.slice(2));
 for (const [overlay, file] of Object.entries(files)) {
   const objs = load(file);
   commonChecks(overlay, objs);
@@ -396,6 +553,11 @@ for (const [overlay, file] of Object.entries(files)) {
     localChecks(objs);
   } else if (overlay === 'aws' || overlay === 'aws-https') {
     awsChecks(overlay, objs, params, overlay === 'aws-https');
+  } else if (overlay === 'local-platform') {
+    check(localParams !== undefined, 'local-platform needs --local-params');
+    if (localParams !== undefined) {
+      localPlatformChecks(objs, localParams);
+    }
   } else {
     failures.push(`unknown overlay ${overlay}`);
   }

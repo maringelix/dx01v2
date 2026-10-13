@@ -35,9 +35,13 @@ do CI): ver `docs/RUNBOOK.md`.
 | `test` | `make test` (service `postgres:17-alpine` por digest, `DB_*` no ambiente) | `test` |
 | `images` | build com buildx + cache do GitHub Actions, depois `make tools && make build` com `IMAGES_PREBUILT=1`; as duas imagens viram um artefato | `build` |
 | `e2e` | carrega o artefato, `bash scripts/install-tools.sh kind kubectl`, `make e2e` com `E2E_SKIP_BUILD=1`; diagnósticos como artefato em caso de falha | `e2e` |
+| `e2e-platform` | carrega o artefato, `make e2e-platform` com `E2E_SKIP_BUILD=1`: clona o tx01v2 no commit de `deploy/local/tx01v2.ref`, sobe o lab local completo, faz o deploy GitOps e roda as sondas (`docs/LAB_LOCAL.md`); diagnósticos como artefato | `platform` |
 
 Os ids `static`, `test`, `images` e `e2e` são estáveis: são os checks exigidos pelo ruleset
-(`.github/rulesets/main.json`); o check `policy-workflows` impede que mudem sem querer.
+(`.github/rulesets/main.json`); o check `policy-workflows` impede que mudem sem querer. O
+`e2e-platform` roda em todo PR e precisa estar verde para o merge (disciplina do mantenedor; ainda fora
+do ruleset). Checks novos: `promtool-rules` (estático: `promtool check rules` e `promtool test rules`
+das regras de alerta do overlay `local-platform`) e `platform-e2e` (estágio `platform`).
 
 ## Modo estrito
 
