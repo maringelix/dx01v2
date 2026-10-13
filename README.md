@@ -41,12 +41,12 @@ The lab family (v2):
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
 | AWS deploy (ECR push, EKS of tx01v2, ExternalSecrets, ALB + WAF, smoke test through the ALB) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-13 (`docs/PUBLICACAO.md`) |
-| **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified locally` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
-| HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified locally` | `make e2e-platform` (probe `smoke`) |
-| Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` by identity (Gateway, web, Prometheus), NetworkPolicies with HBONE | `verified locally` | `contract-app` (`local-platform`); `make e2e-platform` (probe `mesh`) |
-| Observability: ServiceMonitor, five alert rules tested with promtool, Grafana dashboard as code, logs in Loki | `verified locally` | `promtool-rules`; `make e2e-platform` (probes `observability`) |
-| Gatekeeper (the app is admitted under the lab policies), Trivy Operator reports of the app images, HPA 2-4 | `verified locally` | `make e2e-platform` |
-| Database backup + restore drill; chaos experiment (one API pod killed, reads stay up) | `verified locally` | `make e2e-platform` (probes `backup`, `chaos`) |
+| **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
+| HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
+| Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` by identity (Gateway, web, Prometheus), NetworkPolicies with HBONE | `verified in CI` | `contract-app` (`local-platform`); `make e2e-platform` (probe `mesh`) |
+| Observability: ServiceMonitor, five alert rules tested with promtool, Grafana dashboard as code, logs in Loki | `verified in CI` | `promtool-rules`; `make e2e-platform` (probes `observability`) |
+| Gatekeeper (the app is admitted under the lab policies), Trivy Operator reports of the app images, HPA 2-4 | `verified in CI` | `make e2e-platform` |
+| Database backup + restore drill; chaos experiment (one API pod killed, reads stay up) | `verified in CI` | `make e2e-platform` (probes `backup`, `chaos`) |
 
 `verified in CI` rows run on every pull request, on every push to `main` and weekly (CI jobs in the
 Evidence column); the compose row is verified locally only. The AWS row changes only with a

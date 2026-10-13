@@ -6,7 +6,7 @@ Velero, Chaos Mesh) em cima de um kind com ECR, RDS, S3, load balancer e servido
 (`docs/LAB_LOCAL.md` do tx01v2). Este repositório faz o deploy do app nela do jeito GitOps e prova o
 comportamento com sondas. Nada aqui fala com a AWS.
 
-Status: `verificado localmente`; roda também no job `e2e-platform` do CI.
+Status: `verificado no CI` (job `e2e-platform`, 13 sondas) e `verificado localmente` (2026-10-13).
 
 ## Como rodar
 
