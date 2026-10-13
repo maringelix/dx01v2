@@ -16,7 +16,12 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
 - Current status: static, test, build and the kind e2e pass locally in Linux containers and in CI
   (jobs `static`, `test`, `images`, `e2e`). **Nothing of v2 has run in AWS** (`deploy-aws` is
   `not run in the cloud (v2)`).
-- The interface with `tx01v2` is [docs/CONTRATO.md](docs/CONTRATO.md) (contract v1, owned by tx01v2).
+- The app also runs on the full local platform of tx01v2 (kind, Istio ambient, Argo CD, Prometheus,
+  Loki, Gatekeeper, Trivy Operator, chaos): overlay `local-platform`, `scripts/deploy-local.sh` (GitOps)
+  and `make e2e-platform` (CI job `e2e-platform`, [docs/LAB_LOCAL.md](docs/LAB_LOCAL.md)). It is not
+  cloud-mutating: agents may run it, one heavy run at a time (Docker with 8 GB).
+- The interface with `tx01v2` is [docs/CONTRATO.md](docs/CONTRATO.md) (contract v1, owned by tx01v2; the
+  local lab has its own local contract, `lab-system/lab-contract`).
 
 ## 2. Non-negotiable rules
 
@@ -47,8 +52,8 @@ api/                    Express 5 API (src/, migrations/*.sql, test/unit, test/i
 web/                    React 19 page (src/, nginx/default.conf + security-headers.conf, Dockerfile)
 e2e/                    smoke.mjs + lib.mjs: the smoke test for compose, kind and the ALB (no dependencies)
 deploy/k8s/base/        Deployments, Services, ConfigMap, PDBs, NetworkPolicies, ServiceAccounts
-deploy/k8s/overlays/    local (kind: namespace, PostgreSQL), aws, aws-https (EKS of tx01v2)
-deploy/k8s/components/  aws (Ingress, ExternalSecrets, HPA, VPC policies, params) and aws-https
+deploy/k8s/overlays/    local (kind: namespace, PostgreSQL), aws, aws-https (EKS of tx01v2), local-platform
+deploy/k8s/components/  aws (Ingress, ExternalSecrets, HPA, VPC policies, params), aws-https, local-platform
 kind/                   kind-config.yaml (node image pinned by digest)
 compose.yaml            local stack dx01v2-dev; .env from scripts/dev-env.sh (.env.example has placeholders)
 scripts/harness.sh      every check of the harness (stages static, test, build, e2e, all, list)
@@ -56,6 +61,9 @@ scripts/install-tools.sh            pinned tools into .tools/ (SHA256-verified)
 scripts/update-tool-checksums.sh    bump a tool: versions.env + checksums.txt from upstream checksums
 scripts/e2e-kind.sh     kind e2e (cluster dx01v2-e2e); scripts/compose-smoke.sh, scripts/dev-env.sh
 scripts/deploy-aws.sh   AWS deploy (cloud-mutating; used by .github/workflows/deploy-aws.yml)
+scripts/deploy-local.sh GitOps deploy to the tx01v2 local lab (registry, GitOps repository, Argo CD)
+scripts/e2e-platform.sh the app on the full local platform + probes (stage platform)
+deploy/local/           tx01v2.ref: the tx01v2 commit the platform e2e uses
 scripts/render-k8s.sh   render an overlay without touching the repo; check-manifests.mjs asserts the contract
 scripts/repo-guardrails.sh          repository settings via gh api (run by the maintainer)
 scripts/lib/            shared bash helpers (common, tools, k8s)
@@ -85,12 +93,13 @@ docs/                   pt-BR docs: architecture, API, contract, runbook, guardr
 | `HARNESS_STRICT=1 make verify` | static + test with SKIP = FAIL (CI jobs `static` and `test`) | before every PR |
 | `make build` | npm build, both images, image policy, trivy image gate (CI job `images`) | code, Dockerfile or dependency changes |
 | `make e2e` | kind cluster, smoke test, Pod Security and NetworkPolicy probes (CI job `e2e`) | manifest, image or app changes |
+| `make e2e-platform` | the app on the full tx01v2 local platform through GitOps + probes (CI job `e2e-platform`) | manifest, image or app changes |
 | `scripts/harness.sh list` | lists all checks | any time |
 
 ## 6. Definition of Done
 
 - [ ] `HARNESS_STRICT=1 make verify` green locally (plus `make build` and `make e2e` when images,
-      manifests or the app changed); CI green (`static`, `test`, `images`, `e2e`).
+      manifests or the app changed); CI green (`static`, `test`, `images`, `e2e`, `e2e-platform`).
 - [ ] Docs, README status matrix and `CHANGELOG.md` (`[Unreleased]`) updated in the same PR.
 - [ ] No new unexplained scanner ignores; no weakened checks or coverage thresholds.
 - [ ] Contract respected (or bumped with a linked `tx01v2` PR).

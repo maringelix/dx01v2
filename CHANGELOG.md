@@ -8,6 +8,17 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- The app on the full local platform of tx01v2 (docs/LAB_LOCAL.md): overlay `local-platform`
+  (Istio Gateway with HTTPS from cert-manager, HTTPRoutes, ExternalSecrets from `local-secrets`, HPA,
+  `PeerAuthentication` STRICT, `AuthorizationPolicy` by identity, NetworkPolicies with HBONE,
+  ServiceMonitor, five alert rules, a Grafana dashboard); `scripts/deploy-local.sh` (images to the lab
+  registry, GitOps repository, Argo CD Application); `scripts/e2e-platform.sh` with probes (smoke over
+  HTTPS through the emulated load balancer, mesh, observability, Trivy reports, HPA, database backup +
+  restore drill, Argo CD self-heal, chaos experiment). Harness checks `promtool-rules` (tool promtool
+  3.15.0) and `platform-e2e` (stage `platform`, `make e2e-platform`, CI job `e2e-platform`);
+  `contract-app` asserts the new overlay.
+- README status matrix: repository settings as code are applied (read back with `gh api`).
+
 - Initial v2 of the AWS application lab, rebuilt from scratch with the lessons of v1
   (docs/ARQUITETURA.md, "v1 → v2"):
   - `api/`: Express 5 + TypeScript (strict, ESM) on Node.js 24 — message board with zod validation,
