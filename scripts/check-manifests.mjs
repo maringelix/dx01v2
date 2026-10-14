@@ -537,7 +537,7 @@ function localPlatformChecks(objs, params) {
     { to: [{ ipBlock: { cidr: params.DB_ENDPOINT_CIDR } }], ports: [{ protocol: 'TCP', port: 5432 }] },
     `${overlay}: api -> database only`,
   );
-  // Local contract v2: the OTLP endpoint and the paths of the spans (API over the mesh, Gateway plain).
+  // Local contract v2: the OTLP endpoint and the paths of the spans (API and Gateway, both over the mesh).
   eq(
     config.OTEL_EXPORTER_OTLP_ENDPOINT,
     'http://opentelemetry-collector.monitoring.svc:4318',
