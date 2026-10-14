@@ -64,6 +64,17 @@ spec:
       ports:
         - protocol: TCP
           port: 15012
+    # Its spans (OTLP/gRPC, plaintext: the Gateway is not in the mesh) to the OpenTelemetry Collector.
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4317
 ---
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
@@ -143,6 +154,31 @@ spec:
             matchLabels:
               app.kubernetes.io/name: api
       ports:
+        - protocol: TCP
+          port: 15008
+---
+# The traces of the API (OTLP/HTTP, contract key tracing.otlp-endpoint) to the OpenTelemetry Collector
+# of tx01v2, through the mesh (HBONE).
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-egress-to-collector
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  policyTypes: [Egress]
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 4318
         - protocol: TCP
           port: 15008
 ---

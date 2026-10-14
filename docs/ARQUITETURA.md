@@ -110,13 +110,15 @@ API → RDS); os valores do SSM (imagens, ARN do WAF, CIDR) entram por um `param
    (initContainers concorrentes esperam) e checksum em `schema_migrations` (um arquivo aplicado não
    pode mudar). Rodam no initContainer `migrate` (Kubernetes) e no serviço `migrate` (compose).
 10. **Desligamento gracioso.** SIGTERM → `/readyz` 503 → `server.close()` espera as requisições →
-    `pool.end()`; saída forçada após `SHUTDOWN_TIMEOUT_MS` (10 s). No Kubernetes, `preStop` com a ação
+    `pool.end()` → flush dos spans pendentes (no máximo 5 s; um Collector fora do ar não transforma o
+    desligamento em falha); saída forçada após `SHUTDOWN_TIMEOUT_MS` (10 s). No Kubernetes, `preStop` com a ação
     `sleep` de 5 s (beta e ligada por padrão desde o 1.30, estável no 1.34 segundo o KEP-3960;
     disponível no 1.36 do kind e do EKS) dá tempo para o kube-proxy e o ALB tirarem o pod, sem
     precisar de shell na imagem distroless.
 11. **Métricas separadas.** `/metrics` na porta 9464 (prom-client: métricas padrão + histograma por
     método, padrão de rota — `unmatched` para 404 — e status). Nem o web nem o Ingress expõem essa
     porta; a NetworkPolicy só aceita o namespace `monitoring` (não há Prometheus neste lab).
+    O formato é OpenMetrics, para o exemplar com o `trace_id` da requisição.
 12. **Kustomize com componentes.** `base` neutra; `overlays/local` (kind) e `overlays/aws` /
     `aws-https` (componentes `aws` e `aws-https`). Na AWS o HPA controla as réplicas da API
     (`spec.replicas` removido). O CI renderiza e valida todos os overlays com `params.example.env`.
@@ -128,6 +130,12 @@ API → RDS); os valores do SSM (imagens, ARN do WAF, CIDR) entram por um `param
 15. **Um smoke test para todos os ambientes.** `e2e/smoke.mjs` (Node.js puro, sem dependências) roda
     contra o compose, o kind e o ALB; na AWS, `SMOKE_BEHIND_WAF=1` espera o 403 do WAF para corpos
     acima de 8 KB, em vez do 413 da API.
+16. **Traces com OpenTelemetry, sem loader.** A API cria os próprios spans (SERVER por requisição,
+    CLIENT por consulta dentro dela) com a API e o SDK oficiais do OpenTelemetry, em vez da
+    auto-instrumentação, que no ESM exige um hook de carregamento de módulos. Spans em OTLP/HTTP para o
+    Collector da plataforma (`OTEL_EXPORTER_OTLP_ENDPOINT`; desligado sem ele), W3C trace context, e o
+    trace id nos logs (`trace_id`, `span_id`) e nos exemplars. As sondas `/healthz` e `/readyz` não geram
+    span.
 
 ## v1 → v2
 

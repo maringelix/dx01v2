@@ -1,4 +1,7 @@
-# Contrato tx01v2 <-> dx01v2 — versão 1 (2026-10-10)
+# Contrato tx01v2 <-> dx01v2 — versão 2 (2026-10-14)
+
+Versão 2: o OpenTelemetry Collector da camada de plataforma do tx01v2 recebe os traces do app. A versão
+1 (2026-10-10) não tinha traces.
 
 Interface entre a infraestrutura (`tx01v2`) e a aplicação (este repositório), na parte que o app usa.
 A fonte da verdade é o
@@ -11,6 +14,7 @@ repositórios e incremento da versão.
 | O quê | Onde | Status |
 |---|---|---|
 | Nomes de Services, portas, probes, Secrets, ConfigMap, Ingress (classe, anotações, rotas, health checks), ExternalSecrets, HPA, NetworkPolicies, só tipos que a Role `dx01v2-deployer` pode escrever | check `contract-app` (`scripts/check-manifests.mjs` sobre os overlays renderizados) | `verificado localmente` |
+| Endpoint OTLP da versão 2 no ConfigMap da API e NetworkPolicy só até o Collector (namespace `observability`, porta 4318) | check `contract-app` | `verificado localmente` |
 | Manifests válidos para Kubernetes 1.36 e para o CRD `ExternalSecret` (`external-secrets.io/v1`) | check `kubeconform` (estrito) | `verificado localmente` |
 | O deploy lê exatamente os 10 parâmetros SSM abaixo, com o prefixo `/tx01v2/lab`, e cria o `rds-ca` a partir do bundle oficial | check `contract-app` (greps em `scripts/deploy-aws.sh`) | `verificado localmente` |
 | Formatos dos valores vindos do SSM (URLs do ECR, ARN do WAF, CIDR da VPC, ARN do ACM) | `k8s_validate_params` em `scripts/lib/k8s.sh` (renderização com `params.example.env`) | `verificado localmente` |
@@ -28,6 +32,7 @@ repositórios e incremento da versão.
 | Grupo Kubernetes do deployer | `dx01v2-deployers`, ligado no namespace `dx01v2` (RoleBinding `dx01v2-deployers`) à Role `dx01v2-deployer` |
 | Repositórios ECR | `dx01v2/api`, `dx01v2/web` — tags IMMUTABLE, scan on push; imagens com a tag do SHA git completo (40 caracteres) do dx01v2 |
 | Papel OIDC do deploy | `dx01v2-gha-deploy` (criado pelo bootstrap do tx01v2) |
+| Traces (OpenTelemetry) | `http://opentelemetry-collector.observability.svc:4318` (OTLP/HTTP; `OTEL_EXPORTER_OTLP_ENDPOINT` do componente `aws`). O Collector é instalado pela camada de plataforma do tx01v2 e grava os spans no AWS X-Ray da região do lab; o app não recebe nenhuma permissão da AWS para isso |
 
 Regras da Role `dx01v2-deployer` (namespace `dx01v2`), que limitam o que os overlays `aws*` podem
 conter (o check `contract-app` recusa qualquer outro tipo):
@@ -101,13 +106,16 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 - RDS PostgreSQL 17, porta 5432, acessível só a partir do security group do cluster EKS,
   `rds.force_ssl = 1`.
 
-## Lab local (contrato local do tx01v2, versão 1)
+## Lab local (contrato local do tx01v2, versão 2)
 
 O deploy local (scripts/deploy-local.sh, docs/LAB_LOCAL.md) lê o ConfigMap `lab-system/lab-contract`
-da plataforma local do tx01v2 e recusa valores diferentes dos fixados no overlay `local-platform`:`registry` = `registry.tx01v2.local`, `db.secret-name` = `tx01v2-lab-db-app`,
+da plataforma local do tx01v2, exige a versão `2` e recusa valores diferentes dos fixados no overlay
+`local-platform`: `registry` = `registry.tx01v2.local`, `db.secret-name` = `tx01v2-lab-db-app`,
 `app.admin-token-secret-name` = `tx01v2-lab-app-admin-token`, `eso.cluster-secret-store` =
 `local-secrets`, `gateway.class` = `istio`, `tls.cluster-issuer` = `lab-ca`, `argocd.project` = `dx01v2`,
-`monitoring.prometheus-service-account` = `monitoring/kube-prometheus-stack-prometheus`. Do contrato ele
+`monitoring.prometheus-service-account` = `monitoring/kube-prometheus-stack-prometheus`,
+`tracing.otlp-endpoint` = `http://opentelemetry-collector.monitoring.svc:4318` (versão 2: o
+`OTEL_EXPORTER_OTLP_ENDPOINT` da API e as NetworkPolicies até o Collector). Do contrato ele
 lê ainda `registry-push`, `network-cidr`, `db.endpoint-ip`, `db.ca-configmap`, `gitops.push-url`,
 `gitops.read-url` e `gitops.push-key-secret`. A fonte da verdade é o `docs/CONTRATO.md` do tx01v2.
 

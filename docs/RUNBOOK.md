@@ -129,6 +129,10 @@ kubectl -n dx01v2 get pods,ingress,externalsecrets,hpa
 curl -fsS "http://<ALB_HOSTNAME>/api/info"
 ```
 
+Traces (contrato v2): depois de algumas requisições, o serviço `dx01v2-api` aparece no X-Ray (console
+do CloudWatch, traces) da região do lab. O caminho é API → `opentelemetry-collector.observability`
+(OTLP/HTTP, porta 4318) → X-Ray; o Collector e a permissão de escrita são do tx01v2.
+
 ## 9. Desligar
 
 O teardown é o do tx01v2: o workflow `terraform-destroy` roda `platform/uninstall.sh`, que apaga
@@ -146,6 +150,7 @@ Para tirar só o ALB do app e manter o cluster: `kubectl -n dx01v2 delete ingres
 | Ingress sem endereço | AWS Load Balancer Controller ou tags de subnet | `kubectl -n dx01v2 describe ingress dx01v2` (eventos do controller) |
 | Smoke test com 403 em tudo | regra do WAF (reputação de IP, limite por IP) | logs do WAF (`aws-waf-logs-tx01v2-lab`) |
 | `tag invalid ... already exists` no push | tag imutável já publicada | a imagem daquele commit já existe: o script só a reutiliza quando a consulta ao ECR funciona |
+| Nenhum trace no X-Ray | Collector ausente (plataforma antiga do tx01v2, contrato v1) ou sem a permissão do X-Ray | `kubectl -n observability get pods`; logs do Collector (`kubectl -n observability logs deployment/opentelemetry-collector`); a API nunca falha por isso: os spans só se perdem |
 
 ## 11. Registro
 

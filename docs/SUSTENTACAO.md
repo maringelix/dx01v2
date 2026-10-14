@@ -14,7 +14,7 @@ os scripts e workflows, as ferramentas do harness e as rodadas opcionais em nuve
 - Estágios `static`, `test`, `build` e `e2e` `verificado no CI` (jobs `static`, `test`, `images` e
   `e2e`) e localmente em containers Linux.
 - Deploy na AWS: `não executado em nuvem (v2)`.
-- Contrato com o tx01v2: versão 1 (`docs/CONTRATO.md`).
+- Contrato com o tx01v2: versão 2 de 2026-10-14, com o endpoint OTLP do Collector (`docs/CONTRATO.md`).
 - Exceções de scanner: nenhuma (`.trivyignore.yaml` vazio).
 
 ## 3. Rotinas
@@ -37,6 +37,7 @@ os scripts e workflows, as ferramentas do harness e as rodadas opcionais em nuve
 | TypeScript | 6.0.3 | sem data publicada | [typescript-eslint: versões suportadas](https://typescript-eslint.io/users/dependency-versions) | Manter dentro de `>=4.8.4 <6.1.0` (typescript-eslint 8.71); o TypeScript 7 só entra quando o typescript-eslint suportar. O `dependabot.yml` ignora minors e majors do `typescript` (só patches chegam); revisar a regra na revisão trimestral |
 | React / Vite / Vitest | 19.3 / 8.3 / 5.0 | sem calendário publicado; correções vão para a major atual | react.dev, vite.dev, vitest.dev | Majors chegam como PRs individuais do Dependabot; ler o guia de migração |
 | Express | 5.3 | linha 5.x ativa | [política de suporte do Express](https://expressjs.com/en/support/) | Acompanhar pelo Dependabot |
+| OpenTelemetry JS (`@opentelemetry/api` 1.9.1, `sdk-trace-node` e `resources` 2.12.0, `exporter-trace-otlp-http` 0.223.0, `semantic-conventions` 1.43.0) | API 1.x estável; SDK 2.x; o exporter ainda é 0.x (experimental) | sem calendário; correções só na linha atual | [opentelemetry-js](https://github.com/open-telemetry/opentelemetry-js/releases) | Subir os pacotes juntos (o SDK 2.x e o exporter 0.2xx saem na mesma release); um minor do exporter pode quebrar: rode os testes `telemetry` e `tracing` e o `e2e-platform` |
 | PostgreSQL | 17 (`postgres:17-alpine`, imagem com 17.11) | 2029-11-08 (comunidade) | [versionamento do PostgreSQL](https://www.postgresql.org/support/versioning/) | A major segue o RDS do tx01v2 (contrato); trocar compose, CI, kind e harness juntos |
 | nginx (web) | 1.30 estável (`nginxinc/nginx-unprivileged:1.30.5-alpine3.24-slim`) | a linha estável recebe correções até a próxima estável (1.32, prevista para ~abril de 2027) | [nginx.org](https://nginx.org/en/download.html) | Mudar para a nova linha estável (minor par) na revisão trimestral seguinte ao lançamento. O `dependabot.yml` ignora minors do `nginx-unprivileged`, que levariam à linha mainline (ímpar) |
 | Alpine (build e runtime do web) | 3.24 | ~2028-05 (cada versão tem ~2 anos de suporte) | [releases do Alpine](https://alpinelinux.org/releases/) | Acompanha os digests do node e do nginx-unprivileged |
