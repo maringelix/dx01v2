@@ -41,14 +41,16 @@ A família do lab (v2):
 | Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado no CI` | `make build`; job `images` do CI |
 | Stack do compose (PostgreSQL → migrate → api → web em 127.0.0.1) + smoke test | `verificado localmente` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, fora do CI) |
 | Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado no CI` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
-| Deploy na AWS (push no ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, smoke test pelo ALB) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| Deploy na AWS (push no ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, traces para o OpenTelemetry Collector do tx01v2 e o AWS X-Ray, smoke test pelo ALB) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Configurações do repositório como código (ruleset, environment `lab`) | `verificado localmente` | `scripts/repo-guardrails.sh` aplicado; conferido com `gh api` em 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **O app na plataforma local completa do tx01v2** (kind + ECR, RDS, S3, load balancer e servidor git emulados): imagens no registry do lab, GitOps com Argo CD (Synced, Healthy, self-heal) | `verificado no CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS pelo load balancer emulado e um Gateway do Istio (cert-manager, CA do lab), smoke test de fora do mesh; TLS `verify-full` no banco | `verificado no CI` | `make e2e-platform` (sonda `smoke`) |
 | Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` por identidade (Gateway, web, Prometheus), NetworkPolicies com HBONE | `verificado no CI` | `contract-app` (`local-platform`); `make e2e-platform` (sonda `mesh`) |
 | Observabilidade: ServiceMonitor, cinco regras de alerta testadas com promtool, dashboard do Grafana como código, logs no Loki | `verificado no CI` | `promtool-rules`; `make e2e-platform` (sondas `observability`) |
+| Traces com OpenTelemetry: um trace no Tempo do Gateway do Istio até a consulta ao PostgreSQL (W3C trace context), `trace_id` nos logs do Loki, exemplars no histograma de latência | `verificado no CI` | testes da API (`telemetry`, `tracing`); `make e2e-platform` (sonda `tracing`) |
 | Gatekeeper (o app é admitido pelas políticas do lab), relatórios do Trivy Operator das imagens do app, HPA 2-4 | `verificado no CI` | `make e2e-platform` |
-| Ensaio de backup + restore do banco; experimento de chaos (um pod da API morto, leituras continuam) | `verificado no CI` | `make e2e-platform` (sondas `backup`, `chaos`) |
+| Rollout sem downtime: uma versão nova pelo GitOps, nenhuma requisição de um leitor falha durante o rolling update | `verificado no CI` | `make e2e-platform` (sonda `rollout`) |
+| Ensaio de backup + restore do banco; experimentos de chaos com hipótese (um pod da API morto, leituras continuam; 200 ms entre a API e o PostgreSQL, as leituras passam e o trace mostra o atraso) | `verificado no CI` | `make e2e-platform` (sondas `backup`, `chaos`) |
 
 As linhas `verificado no CI` rodam em todo pull request, em todo push para a `main` e toda semana
 (jobs do CI na coluna Evidência); a linha do compose é verificada só localmente. A linha da AWS só
@@ -131,7 +133,7 @@ destroy do tx01v2 + checagem de sobras → issue `cloud_run_report`.
 | [FORK.md](FORK.md) | fork do lab (em inglês): o que o GitHub não copia, o lab local, a sua conta de nuvem |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagramas (local, kind, AWS), decisões, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, erros, exemplos em curl |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v1 (lado do app; fonte da verdade no tx01v2) |
+| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v2 (lado do app; fonte da verdade no tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | desenvolvimento local, compose, e2e no kind, deploy na AWS |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | regras, aplicação, exceções, limites |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, modo estrito, problemas comuns |

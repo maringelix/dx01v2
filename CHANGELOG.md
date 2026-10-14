@@ -6,8 +6,31 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Fixed
+
+- `scripts/deploy-local.sh` waits for the Argo CD sync of the commit it pushed: on a redeploy the
+  Application was still Synced and Healthy on the previous commit, and the script went on too early.
+
 ### Added
 
+- Traces with OpenTelemetry ("Observability 2.0", the last step of the v1 roadmap, never started
+  there): the API creates a SERVER span per request (named after the route) and a CLIENT span per
+  PostgreSQL query inside it (parameterized SQL only), continues the W3C `traceparent` of the Gateway
+  and exports OTLP/HTTP to `OTEL_EXPORTER_OTLP_ENDPOINT` (off without it: compose, kind, tests). Manual
+  spans with `@opentelemetry/api` 1.9.1, `sdk-trace-node` 2.12.0, `exporter-trace-otlp-http` 0.223.0,
+  `resources` 2.12.0 and `semantic-conventions` 1.43.0, no ESM loader hook; `/healthz` and `/readyz`
+  are not traced; shutdown flushes the spans for at most 5 s and never fails because of the Collector.
+  Log lines carry `trace_id`/`span_id`, and `/metrics` speaks OpenMetrics with the trace id as an
+  exemplar of the latency histogram. New unit and integration tests (`telemetry`, `tracing`).
+- Contract version 2 with tx01v2: the overlay `local-platform` sends the traces to the Collector of the
+  local contract (`tracing.otlp-endpoint`, required by `scripts/deploy-local.sh`), the component `aws`
+  to `opentelemetry-collector.observability.svc:4318` (`not run in the cloud (v2)`). NetworkPolicies
+  widened only for that: API → Collector (4318) and Gateway → Collector (4317, its spans), both over
+  HBONE (15008) in the mesh; `contract-app` asserts both.
+- `make e2e-platform` has 18 probes (was 13): one trace in Tempo from the Gateway to the query, the
+  `trace_id` in the log lines in Loki and in an exemplar in Prometheus; a zero-downtime rollout (a new
+  version through GitOps, no failed request of a reader); 200 ms of latency between the API and
+  PostgreSQL (NetworkChaos), every read passes and the trace shows the delay in the query span.
 - `FORK.md`: forking the app step by step (the steps shared with tx01v2, the local runs, testing against
   your own tx01v2, deploying to your own cloud account, troubleshooting), linked from both READMEs and
   CONTRIBUTING.md; the harness requires it.

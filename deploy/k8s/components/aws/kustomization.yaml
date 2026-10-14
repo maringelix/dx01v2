@@ -33,6 +33,11 @@ patches:
       - op: add
         path: /data/DB_SSL_CA_FILE
         value: /etc/rds-ca/ca.pem
+      # Traces to the OpenTelemetry Collector of the platform layer of tx01v2 (contract v2), which
+      # writes them to AWS X-Ray.
+      - op: add
+        path: /data/OTEL_EXPORTER_OTLP_ENDPOINT
+        value: http://opentelemetry-collector.observability.svc:4318
   # The HPA owns the replica count (2-4); keeping spec.replicas would reset it on every deploy.
   - target:
       kind: Deployment

@@ -116,7 +116,7 @@ remove tudo isso.
 | `FAIL trivy-image:*` | CVE HIGH/CRITICAL com correção nova | `docs/SUSTENTACAO.md`, seção 5.6 |
 | `FAIL trivyignore-policy ... expired` | ignore venceu | revise a exceção: corrija ou renove com nova justificativa |
 | `FAIL kubeconform ... could not find schema` | sem rede, ou schema do catálogo que o kubeconform não compila | confira a rede; os commits dos catálogos estão fixados em `scripts/harness.sh` |
-| `FAIL contract-app` | manifest divergente do contrato v1 ou do hardening | corrija o manifest; mudança de contrato exige PR coordenado com o tx01v2 |
+| `FAIL contract-app` | manifest divergente do contrato v2 ou do hardening | corrija o manifest; mudança de contrato exige PR coordenado com o tx01v2 |
 | `FAIL kind-e2e` | rollout, smoke ou sonda falhou | leia o resumo e os diagnósticos (`E2E_DIAGNOSTICS_DIR`, artefato `e2e-diagnostics` no CI); `KEEP_CLUSTER=1 make e2e` para investigar |
 | `FAIL gitleaks` | segredo ou falso positivo | remova o segredo e gire a credencial; placeholders devem ter cara de placeholder (por exemplo SHA só com zeros). Antes do primeiro commit o check examina os arquivos visíveis ao git |
 | `FAIL policy-identifiers` | ID de conta, e-mail ou IP real | use `123456789012`, `you@example.com`, `203.0.113.10/32` |
