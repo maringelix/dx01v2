@@ -49,7 +49,7 @@ ExternalSecrets de `local-secrets`; HPA 2-4; `PeerAuthentication` `STRICT` e `Au
 identidade (Gateway e web para a API, Gateway para o web, Prometheus para a porta de métricas);
 NetworkPolicies com HBONE (15008) e as sondas do kubelet do ambient (`169.254.7.127/32`); saída da API só
 para o banco (`/32`) e para o OpenTelemetry Collector (OTLP/HTTP, `OTEL_EXPORTER_OTLP_ENDPOINT`), saída
-do Gateway para o Collector (os spans dele, OTLP/gRPC); ServiceMonitor, cinco regras de alerta e um
+do Gateway para o Collector (os spans dele, OTLP/gRPC), as duas pelo mesh (HBONE); ServiceMonitor, cinco regras de alerta e um
 dashboard do Grafana.
 
 ## Traces, logs e métricas ligados

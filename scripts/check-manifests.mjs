@@ -560,13 +560,21 @@ function localPlatformChecks(objs, params) {
     ],
     `${overlay}: api -> OpenTelemetry Collector (OTLP/HTTP over HBONE) only`,
   );
-  // Every Gateway egress rule that names the Collector: exactly one, OTLP/gRPC (4317) only.
+  // Every Gateway egress rule that names the Collector: exactly one, OTLP/gRPC (4317) over HBONE (15008).
   eq(
     (find(objs, 'NetworkPolicy', 'gateway-egress')?.spec?.egress ?? []).filter((r) =>
       (r.to ?? []).some((peer) => JSON.stringify(canonical(peer)) === JSON.stringify(canonical(collector))),
     ),
-    [{ to: [collector], ports: [{ protocol: 'TCP', port: 4317 }] }],
-    `${overlay}: the Gateway must reach the OpenTelemetry Collector on 4317 (its spans) and only there`,
+    [
+      {
+        to: [collector],
+        ports: [
+          { protocol: 'TCP', port: 4317 },
+          { protocol: 'TCP', port: 15008 },
+        ],
+      },
+    ],
+    `${overlay}: the Gateway must reach the OpenTelemetry Collector on 4317 over HBONE (its spans) and only there`,
   );
   for (const name of ['api-ingress-mesh', 'web-ingress-mesh']) {
     const rules = find(objs, 'NetworkPolicy', name)?.spec?.ingress ?? [];

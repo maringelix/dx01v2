@@ -25,8 +25,8 @@ All notable changes to this project are documented here. The format follows
 - Contract version 2 with tx01v2: the overlay `local-platform` sends the traces to the Collector of the
   local contract (`tracing.otlp-endpoint`, required by `scripts/deploy-local.sh`), the component `aws`
   to `opentelemetry-collector.observability.svc:4318` (`not run in the cloud (v2)`). NetworkPolicies
-  widened only for that: API → Collector (4318, and HBONE 15008 in the mesh) and Gateway → Collector
-  (4317, its spans); `contract-app` asserts both.
+  widened only for that: API → Collector (4318) and Gateway → Collector (4317, its spans), both over
+  HBONE (15008) in the mesh; `contract-app` asserts both.
 - `make e2e-platform` has 18 probes (was 13): one trace in Tempo from the Gateway to the query, the
   `trace_id` in the log lines in Loki and in an exemplar in Prometheus; a zero-downtime rollout (a new
   version through GitOps, no failed request of a reader); 200 ms of latency between the API and
