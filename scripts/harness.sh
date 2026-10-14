@@ -55,7 +55,7 @@ REQUIRED_FILES=(
   scripts/dev-env.sh scripts/compose-smoke.sh scripts/e2e-kind.sh scripts/deploy-aws.sh scripts/render-k8s.sh
   deploy/k8s/components/aws/params.example.env
 )
-STABLE_CI_JOBS=(static test images e2e)
+STABLE_CI_JOBS=(static test images e2e e2e-platform)
 
 # ---------------------------------------------------------------------------------------------
 # Check registry and helpers

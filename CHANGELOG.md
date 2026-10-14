@@ -46,6 +46,8 @@ All notable changes to this project are documented here. The format follows
 
 ### Changed
 
+- The ruleset requires the CI job `e2e-platform` too (`.github/rulesets/main.json`, applied with
+  `scripts/repo-guardrails.sh`): the local lab is a merge gate, not only maintainer discipline.
 - The CI (`static`, `test`, `images`, `e2e`) ran green on GitHub: the README status matrix now says
   `verified in CI` for those rows (the compose row stays `verified locally`).
 - Dependabot ignores minor and major updates of `typescript` (typescript-eslint 8.71 accepts
