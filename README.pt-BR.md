@@ -6,6 +6,8 @@ Metade de aplicação de um lab de DevOps: um mural de mensagens pequeno (API Ex
 
 [English](README.md)
 
+**Fork do lab:** o [FORK.md](FORK.md) (em inglês) leva você do fork ao lab rodando, primeiro na sua máquina, depois na sua conta de nuvem.
+
 ## O que é
 
 Um lab público e educacional para clonar ou fazer fork e aprender como um app web pequeno é
@@ -40,7 +42,7 @@ A família do lab (v2):
 | Stack do compose (PostgreSQL → migrate → api → web em 127.0.0.1) + smoke test | `verificado localmente` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, fora do CI) |
 | Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado no CI` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
 | Deploy na AWS (push no ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, smoke test pelo ALB) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
-| Configurações do repositório como código (ruleset, environment `lab`) | `verificado localmente` | `scripts/repo-guardrails.sh` aplicado; conferido com `gh api` em 2026-10-13 (`docs/PUBLICACAO.md`) |
+| Configurações do repositório como código (ruleset, environment `lab`) | `verificado localmente` | `scripts/repo-guardrails.sh` aplicado; conferido com `gh api` em 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **O app na plataforma local completa do tx01v2** (kind + ECR, RDS, S3, load balancer e servidor git emulados): imagens no registry do lab, GitOps com Argo CD (Synced, Healthy, self-heal) | `verificado no CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS pelo load balancer emulado e um Gateway do Istio (cert-manager, CA do lab), smoke test de fora do mesh; TLS `verify-full` no banco | `verificado no CI` | `make e2e-platform` (sonda `smoke`) |
 | Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` por identidade (Gateway, web, Prometheus), NetworkPolicies com HBONE | `verificado no CI` | `contract-app` (`local-platform`); `make e2e-platform` (sonda `mesh`) |
@@ -126,6 +128,7 @@ destroy do tx01v2 + checagem de sobras → issue `cloud_run_report`.
 
 | Documento | Conteúdo |
 |---|---|
+| [FORK.md](FORK.md) | fork do lab (em inglês): o que o GitHub não copia, o lab local, a sua conta de nuvem |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagramas (local, kind, AWS), decisões, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, erros, exemplos em curl |
 | [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v1 (lado do app; fonte da verdade no tx01v2) |

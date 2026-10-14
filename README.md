@@ -6,6 +6,8 @@ Application half of a DevOps lab: a small message board (Express 5 API, React 19
 
 [Português](README.pt-BR.md)
 
+**Fork this lab:** [FORK.md](FORK.md) takes you from a fork to a running lab, on your machine first, then in your own cloud account.
+
 ## What is this
 
 A public, educational lab you can clone or fork to learn how a small web app is built, tested,
@@ -40,7 +42,7 @@ The lab family (v2):
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
 | AWS deploy (ECR push, EKS of tx01v2, ExternalSecrets, ALB + WAF, smoke test through the ALB) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
-| Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-13 (`docs/PUBLICACAO.md`) |
+| Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
 | Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` by identity (Gateway, web, Prometheus), NetworkPolicies with HBONE | `verified in CI` | `contract-app` (`local-platform`); `make e2e-platform` (probe `mesh`) |
@@ -128,6 +130,7 @@ All docs are in Brazilian Portuguese.
 
 | Doc | Content |
 |---|---|
+| [FORK.md](FORK.md) | fork the lab: what GitHub does not copy, the local lab, your own cloud account |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagrams (local, kind, AWS), decisions, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, errors, curl examples |
 | [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v1 (app side; source of truth in tx01v2) |
