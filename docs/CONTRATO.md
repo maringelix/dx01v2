@@ -44,7 +44,7 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 
 | Papel | `sub` permitido (StringEquals, audience `sts.amazonaws.com`) |
 |---|---|
-| `dx01v2-gha-deploy` | `repo:<owner>/dx01v2:environment:lab` (dono configurável no tx01v2, padrão `maringelix`) |
+| `dx01v2-gha-deploy` | `repo:<owner>/dx01v2:environment:lab` (dono configurável no tx01v2, `github_owner`, sem padrão) |
 
 Por isso o job do `deploy-aws.yml` usa `environment: lab` (o check `policy-workflows` exige).
 Permissões de `dx01v2-gha-deploy`: `ecr:GetAuthorizationToken` em `*`; push/pull apenas nos dois
