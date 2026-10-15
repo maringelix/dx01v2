@@ -18,7 +18,7 @@ declare -A K8S_LOCAL_PARAM_PATTERN=(
   [DB_ENDPOINT_CIDR]='^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/32$'
 )
 
-# Formats accepted for every deploy parameter (values come from SSM, contract v1).
+# Formats accepted for every deploy parameter (values come from SSM, docs/CONTRATO.md).
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_PARAM_PATTERN=(
   [API_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api:[0-9a-f]{40}$'

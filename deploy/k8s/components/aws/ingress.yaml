@@ -1,4 +1,4 @@
-# Contract v1: AWS Load Balancer Controller, class alb, internet-facing, target-type ip, HTTP 80,
+# Contract: AWS Load Balancer Controller, class alb, internet-facing, target-type ip, HTTP 80,
 # WAF web ACL from SSM (/tx01v2/lab/waf/acl-arn). /api goes straight to the API, / to the web.
 apiVersion: networking.k8s.io/v1
 kind: Ingress

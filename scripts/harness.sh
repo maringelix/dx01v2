@@ -542,7 +542,7 @@ check_kubeconform() {
   summary "kubeconform -strict (Kubernetes $K8S_SCHEMA_KUBERNETES_VERSION): $(for o in "${K8S_OVERLAYS[@]}"; do printf '%s: %s; ' "$o" "$(grep -oE '[0-9]+ resources found.*' "$dir/$o.summary")"; done)"
 }
 
-# Contract v1 (docs/CONTRATO.md): manifests and the deploy script use exactly the agreed names.
+# The contract (docs/CONTRATO.md): manifests and the deploy script use exactly the agreed names.
 check_contract_app() {
   local dir="$HARNESS_WORK_DIR/k8s-contract" rc=0 name
   need kubectl node
@@ -554,12 +554,12 @@ check_contract_app() {
   for name in region cluster-name vpc-id vpc-cidr ecr/api-url ecr/web-url waf/acl-arn db/secret-name \
     app/admin-token-secret-name eso/cluster-secret-store; do
     grep -qF "\"\$SSM_PREFIX/$name\"" scripts/deploy-aws.sh || {
-      echo "scripts/deploy-aws.sh must read the SSM parameter /tx01v2/lab/$name (contract v1)"
+      echo "scripts/deploy-aws.sh must read the SSM parameter /tx01v2/lab/$name (docs/CONTRATO.md)"
       rc=1
     }
   done
   grep -qF 'SSM_PREFIX=/tx01v2/lab' scripts/deploy-aws.sh || {
-    echo "scripts/deploy-aws.sh must use the SSM prefix /tx01v2/lab (contract v1)"
+    echo "scripts/deploy-aws.sh must use the SSM prefix /tx01v2/lab (docs/CONTRATO.md)"
     rc=1
   }
   grep -qF 'https://truststore.pki.rds.amazonaws.com/' scripts/deploy-aws.sh || {

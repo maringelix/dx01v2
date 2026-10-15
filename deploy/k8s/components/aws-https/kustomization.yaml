@@ -1,4 +1,4 @@
-# Optional HTTPS listener (contract v1: only when an ACM certificate ARN is supplied). Use after
+# Optional HTTPS listener (contract: only when an ACM certificate ARN is supplied). Use after
 # components/aws, which provides the deploy-params ConfigMap (ALB_CERTIFICATE_ARN). HTTP 80
 # redirects to 443; behind HTTPS the web nginx starts sending HSTS (X-Forwarded-Proto: https).
 apiVersion: kustomize.config.k8s.io/v1alpha1
