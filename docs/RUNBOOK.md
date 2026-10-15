@@ -33,10 +33,17 @@ docker rm -f dx01v2-dev-pg         # ao terminar
 ```
 
 Comandos úteis: `npm run lint`, `npm run typecheck`, `npm run format`, `npm run build`; testes:
-`npm run test:coverage --workspace api` (usa o banco de `DB_*` e **apaga e recria as tabelas**: só
-com um banco descartável como o acima) e `npm run test:coverage --workspace web`. O gate completo é
-`HARNESS_STRICT=1 make verify` (com `DB_*` exportadas ele usa esse banco; sem elas, sobe um
-PostgreSQL descartável).
+`npm run test:coverage --workspace web` e, para a API, que usa o banco de `DB_*` e **apaga e recria
+as tabelas**, um banco cujo nome termina em `_test` (os testes recusam qualquer outro nome):
+
+```bash
+docker exec dx01v2-dev-pg createdb -U dx01v2 dx01v2_test
+DB_NAME=dx01v2_test npm run test:coverage --workspace api
+```
+
+O gate completo é `HARNESS_STRICT=1 make verify`: sem `DB_HOST` ele sobe um PostgreSQL descartável;
+com `DB_*` exportadas, usa esse banco e recusa um `DB_NAME` que não termine em `_test` (neste shell:
+`env -u DB_HOST HARNESS_STRICT=1 make verify`).
 
 ## 3. Stack do compose (projeto `dx01v2-dev`)
 
@@ -124,7 +131,8 @@ Em Apple Silicon o build `linux/amd64` roda emulado (mais lento): os nós do tx0
 ## 8. Conferir
 
 ```bash
-aws eks update-kubeconfig --name tx01v2-lab --region us-east-1
+aws eks update-kubeconfig --name tx01v2-lab --region us-east-1 --kubeconfig ~/.kube/tx01v2-lab.kubeconfig
+export KUBECONFIG=~/.kube/tx01v2-lab.kubeconfig   # só neste terminal; o ~/.kube/config não muda
 kubectl -n dx01v2 get pods,ingress,externalsecrets,hpa
 curl -fsS "http://<ALB_HOSTNAME>/api/info"
 ```
