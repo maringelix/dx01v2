@@ -765,7 +765,7 @@ check_platform_e2e() {
   bash scripts/e2e-platform.sh
 }
 
-# Heavy (Docker-in-Docker with 6 GB): meant for the CI runner, never part of `all`.
+# Heavy (Docker-in-Docker with 7 GB): meant for the CI runner, never part of `all`.
 check_platform_small_e2e() {
   need tar
   need_docker
@@ -893,7 +893,7 @@ list_checks() {
   echo "  build   npm build, docker images, image policy, trivy image gate (HIGH/CRITICAL, fixable)"
   echo "  e2e     kind cluster: manifests, PSA restricted, smoke test, NetworkPolicy enforcement"
   echo "  platform the app on the full tx01v2 local platform (GitOps, mesh, observability, policies, backup, chaos)"
-  echo "  platform-small the same e2e on the small platform size, inside Docker limited to 6 GB (heavy: CI only)"
+  echo "  platform-small the same e2e on the small platform size, inside Docker limited to 7 GB (heavy: CI only)"
   echo "  all     static + test + build + e2e"
   echo "checks:"
   for i in "${!CHECK_NAME[@]}"; do

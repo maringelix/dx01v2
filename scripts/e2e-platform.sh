@@ -14,7 +14,7 @@
 # Environment: TX01V2_DIR (a tx01v2 checkout; default: clone at the pinned commit), TX01V2_REPO (the
 # https URL to clone; default: the original tx01v2, set it to your fork, FORK.md), E2E_SKIP_BUILD=1,
 # KEEP_LAB=1, LOCAL_KIND_INTERNAL=1 (inside a container that drives the host Docker daemon),
-# LOCAL_SIZE=small (the size of the tx01v2 platform for 6 GB of Docker memory, proved in the CI by
+# LOCAL_SIZE=small (the size of the tx01v2 platform for 7 GB of Docker memory, proved in the CI by
 # scripts/e2e-platform-small.sh; docs/LAB_LOCAL.md), E2E_DIAGNOSTICS_DIR (default
 # ${TMPDIR:-/tmp}/dx01v2-harness/platform-diagnostics).
 set -euo pipefail

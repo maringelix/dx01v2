@@ -7,7 +7,7 @@
 # HEAVY: it needs SMALL_MEMORY free on top of everything else the machine runs, and the inner daemon
 # pulls every image of the lab again. It is meant for the CI runner (16 GB). On a 16 GB laptop that
 # also runs an editor and a browser, do not run it: use e2e-platform with LOCAL_SIZE=small.
-# Environment: SMALL_MEMORY (default 6g), E2E_SKIP_BUILD=1 (copies dx01v2-api:e2e and dx01v2-web:e2e
+# Environment: SMALL_MEMORY (default 7g, the size measured in docs/LAB_LOCAL.md), E2E_SKIP_BUILD=1 (copies dx01v2-api:e2e and dx01v2-web:e2e
 # from the outer Docker instead of building them inside), TX01V2_REPO (as in e2e-platform.sh),
 # E2E_DIAGNOSTICS_DIR (default ${TMPDIR:-/tmp}/dx01v2-harness/platform-diagnostics).
 set -euo pipefail
@@ -21,7 +21,7 @@ DIND_IMAGE="docker:29.9.0-dind@sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c22
 # only the latest build of each package in a branch, so the versions follow the pinned base image.
 PACKAGES=(bash curl git make unzip xz jq openssh-client nodejs coreutils findutils grep sed gawk tar procps)
 NODE=tx01v2-local-control-plane
-MEMORY="${SMALL_MEMORY:-6g}"
+MEMORY="${SMALL_MEMORY:-7g}"
 NAME="dx01v2-small-$$"
 DIAG_DIR="${E2E_DIAGNOSTICS_DIR:-${TMPDIR:-/tmp}/dx01v2-harness/platform-diagnostics}"
 SAMPLER=""
@@ -71,7 +71,7 @@ gib() {
 main() {
   local rc=0 i peak anon events hits oom summary top
   require_cmd docker tar
-  [[ "$MEMORY" =~ ^[0-9]+[mg]$ ]] || die "SMALL_MEMORY must look like 6g or 6144m (got '$MEMORY')"
+  [[ "$MEMORY" =~ ^[0-9]+[mg]$ ]] || die "SMALL_MEMORY must look like 7g or 7168m (got '$MEMORY')"
   trap cleanup EXIT
   log "Docker-in-Docker $NAME limited to $MEMORY, no swap"
   docker run -d --privileged --name "$NAME" --memory "$MEMORY" --memory-swap "$MEMORY" "$DIND_IMAGE" >/dev/null
@@ -104,10 +104,11 @@ main() {
   hits="$(awk '$1 == "max" { print $2 }' <<<"$events")"
   oom="$(awk '$1 == "oom_kill" { print $2 }' <<<"$events")"
   summary="Docker limited to $MEMORY: peak $(gib "$peak") (anonymous $(gib "$anon")), limit reached ${hits:-?} times, OOM kills ${oom:-?}"
-  printf 'largest containers of the kind node (peak working set):\n%s\n' "$top"
-  printf 'SUMMARY: %s\n' "$summary"
+  # SUMMARY lines: the harness prints them also when the check passes.
+  printf 'SUMMARY: %s\nSUMMARY: largest containers of the kind node (peak working set):\n' "$summary"
+  sed 's/^/SUMMARY: /' <<<"$top"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    printf '### Platform e2e, size small\n\n%s; e2e exit code %s\n\n```\n%s\n```\n' "$summary" "$rc" "$top" >>"$GITHUB_STEP_SUMMARY"
+    printf '### Platform e2e, size small\n\n%s; e2e exit code %s\n\n<pre>\n%s\n</pre>\n' "$summary" "$rc" "$top" >>"$GITHUB_STEP_SUMMARY"
   fi
   if ((rc == 0)) && [[ "$oom" != 0 ]]; then
     log "error: OOM kills inside the Docker daemon (${oom:-unknown}): the platform does not fit in $MEMORY"

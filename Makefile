@@ -31,7 +31,7 @@ e2e: ## kind cluster dx01v2-e2e: deploy, smoke test, NetworkPolicy probes (needs
 e2e-platform: ## The app on the full tx01v2 local platform: deploy through Argo CD + probes (needs Docker, 8 GB)
 	@$(HARNESS) platform
 
-e2e-platform-small: ## The same e2e on the small platform size inside Docker limited to 6 GB (heavy: CI only)
+e2e-platform-small: ## The same e2e on the small platform size inside Docker limited to 7 GB (heavy: CI only)
 	@$(HARNESS) platform-small
 
 all: ## Every stage: static + test + build + e2e
