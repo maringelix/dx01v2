@@ -14,7 +14,8 @@ os scripts e workflows, as ferramentas do harness e as rodadas opcionais em nuve
 - Estágios `static`, `test`, `build` e `e2e` `verificado no CI` (jobs `static`, `test`, `images` e
   `e2e`) e localmente em containers Linux.
 - Deploy na AWS: `não executado em nuvem (v2)`.
-- Contrato com o tx01v2: versão 2 de 2026-10-14, com o endpoint OTLP do Collector (`docs/CONTRATO.md`).
+- Contrato com o tx01v2: versão 3 de 2026-10-15, com subject OIDC imutável; a versão 2 adicionou o
+  endpoint OTLP do Collector (`docs/CONTRATO.md`).
 - Exceções de scanner: nenhuma (`.trivyignore.yaml` vazio).
 
 ## 3. Rotinas

@@ -229,10 +229,16 @@ wait_for_ingress() {
 smoke() {
   local token status=0
   BASE="${SMOKE_BASE_URL:-http://$ALB_HOSTNAME}"
-  token="$(kubectl -n "$NAMESPACE" get secret app-secrets -o jsonpath='{.data.ADMIN_TOKEN}' | base64 -d)"
-  [[ ${#token} -ge 32 ]] || die "the Secret app-secrets has no usable ADMIN_TOKEN (is the ExternalSecret synced?)"
-  if in_actions; then
-    echo "::add-mask::$token"
+  token=""
+  if [[ "$BASE" == https://* ]]; then
+    token="$(kubectl -n "$NAMESPACE" get secret app-secrets -o jsonpath='{.data.ADMIN_TOKEN}' | base64 -d)"
+    [[ ${#token} -ge 32 ]] || die "the Secret app-secrets has no usable ADMIN_TOKEN (is the ExternalSecret synced?)"
+    if in_actions; then
+      echo "::add-mask::$token"
+    fi
+  else
+    # The admin token is a credential: it never goes over plain HTTP to the internet.
+    log "the entry point is plain HTTP: the admin token is not read, and the smoke test skips the DELETE that needs it (ALB_CERTIFICATE_ARN and SMOKE_BASE_URL give HTTPS)"
   fi
   # SMOKE_BEHIND_WAF=1: the WAF of tx01v2 answers oversized bodies with 403 before the API does.
   BASE_URL="$BASE" ADMIN_TOKEN="$token" SMOKE_WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-900}" SMOKE_BEHIND_WAF=1 \

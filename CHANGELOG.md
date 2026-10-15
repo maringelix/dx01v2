@@ -8,6 +8,24 @@ All notable changes to this project are documented here. The format follows
 
 ### Security
 
+- Contract version 3 with tx01v2, coordinated with [tx01v2#14](https://github.com/maringelix/tx01v2/pull/14):
+  the deploy identity now documents the immutable GitHub owner and repository IDs; its workflow uses
+  the protected `lab` environment (roadmap R3.15). The version 2 application parameters and tracing
+  requirements remain in place.
+- The smoke test never sends the admin token over plain HTTP to another machine (roadmap R3.17): it
+  is sent over HTTPS or to `127.0.0.1`; on any other plain HTTP entry point, such as the AWS lab
+  without a certificate, the one call that needs it is skipped (`SKIP` in the output) and
+  `scripts/deploy-aws.sh` does not even read the token.
+- `scripts/repo-guardrails.sh` (same file in the six lab repositories, roadmap R3.15 and R3.18) fails
+  instead of skipping when it cannot protect the environment `lab`, leaves only `main` in it, reads it
+  back, fails when the OIDC subject of the repository is name-based (the cloud trust expects the
+  immutable one with the owner and repository IDs) and refuses an argument that is not the
+  repository of the clone.
+- `scripts/e2e-platform.sh` keeps the state of its lab in a directory of its own, so a lab you keep
+  with `make local-up` in tx01v2 is never adopted and destroyed by it, and reads diagnostics only
+  through the kubeconfig of the lab: until the lab exists, `kubectl` has no cluster to reach.
+- `make clean` removes things only under the directory of the Makefile, wherever make was started
+  from (roadmap R3.18).
 - The integration tests drop and recreate tables (`messages`, `schema_migrations`), and with
   `DB_HOST` set the harness ran them against whatever database `DB_*` pointed at, such as the
   development database of `docs/RUNBOOK.md`. They now refuse a `DB_NAME` that does not end in `_test`,

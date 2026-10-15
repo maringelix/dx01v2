@@ -37,6 +37,7 @@ A família do lab (v2):
 | Dockerfiles, workflows e scripts (hadolint, actionlint, shellcheck) | `verificado no CI` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
 | Manifests Kubernetes: render do kustomize + kubeconform estrito (local, aws, aws-https), asserções de contrato e de hardening, trivy config | `verificado no CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
 | Scan de segredos e políticas do repositório (sem identificadores reais, actions e imagens fixadas, regressões do v1) | `verificado no CI` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
+| Identidade de deploy do GitHub usa o environment protegido `lab` e o subject imutável de dono/repositório esperado pelo tx01v2 | `verificado no CI` | `policy-workflows`; testes OIDC do tx01v2#14 coordenado |
 | Testes unitários + de integração da API contra um PostgreSQL 17 real (gate de cobertura: linhas >= 80 %, branches >= 70 %) | `verificado no CI` | `make test` (`test:api`); job `test` do CI |
 | Testes da página com Testing Library + jsdom (gate de cobertura: linhas >= 70 %) | `verificado no CI` | `make test` (`test:web`); job `test` do CI |
 | Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado no CI` | `make build`; job `images` do CI |
@@ -136,7 +137,7 @@ destroy do tx01v2 + checagem de sobras → issue `cloud_run_report`.
 | [FORK.md](FORK.md) | fork do lab (em inglês): o que o GitHub não copia, o lab local, a sua conta de nuvem |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagramas (local, kind, AWS), decisões, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, erros, exemplos em curl |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v2 (lado do app; fonte da verdade no tx01v2) |
+| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v3 (lado do app; fonte da verdade no tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | desenvolvimento local, compose, e2e no kind, deploy na AWS |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | regras, aplicação, exceções, limites |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, modo estrito, problemas comuns |

@@ -1,7 +1,9 @@
-# Contrato tx01v2 <-> dx01v2 — versão 2 (2026-10-14)
+# Contrato tx01v2 <-> dx01v2 — versão 3 (2026-10-15)
 
-Versão 2: o OpenTelemetry Collector da camada de plataforma do tx01v2 recebe os traces do app. A versão
-1 (2026-10-10) não tinha traces.
+Versão 3: o subject OIDC do deploy inclui os IDs imutáveis do dono e do repositório; o environment
+`lab` só permite deploy pela `main` (R3.15). A versão 2 (2026-10-14) adicionou traces do app pelo
+OpenTelemetry Collector da camada de plataforma do tx01v2 ao AWS X-Ray; a versão 1 (2026-10-10) não
+tinha traces.
 
 Interface entre a infraestrutura (`tx01v2`) e a aplicação (este repositório), na parte que o app usa.
 A fonte da verdade é o
@@ -49,7 +51,11 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 
 | Papel | `sub` permitido (StringEquals, audience `sts.amazonaws.com`) |
 |---|---|
-| `dx01v2-gha-deploy` | `repo:<owner>/dx01v2:environment:lab` (dono configurável no tx01v2, `github_owner`, sem padrão) |
+| `dx01v2-gha-deploy` | `repo:<owner>@<owner id>/dx01v2@<repo id>:environment:lab` (dono e IDs configuráveis no tx01v2: `github_owner`, `github_owner_id`, `dx01v2_repository_id`, sem padrão) |
+
+É o `sub` imutável do GitHub, o dos repositórios criados depois de 2026-07-15 (um fork também): leva o ID
+numérico do dono e o do repositório, então um nome de conta apagado e registrado de novo não herda o
+lab. O environment `lab` só implanta a partir de `main`.
 
 Por isso o job do `deploy-aws.yml` usa `environment: lab` (o check `policy-workflows` exige).
 Permissões de `dx01v2-gha-deploy`: `ecr:GetAuthorizationToken` em `*`; push/pull apenas nos dois
