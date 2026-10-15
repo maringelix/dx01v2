@@ -1,4 +1,4 @@
-# Deploys dx01v2 to the EKS lab cluster of tx01v2 (contract v1, docs/CONTRATO.md). CLOUD-MUTATING
+# Deploys dx01v2 to the EKS lab cluster of tx01v2 (docs/CONTRATO.md). CLOUD-MUTATING
 # and billable (ECR images, an internet-facing ALB): dispatch manually after the tx01v2 apply and
 # platform workflows; tear down with the tx01v2 destroy. The `lab` environment (required reviewer,
 # main only) gates the OIDC role dx01v2-gha-deploy. Not run in the cloud yet (v2).

@@ -5,7 +5,7 @@ import { readFileSync } from 'node:fs';
 import { parseAllDocuments } from 'yaml';
 
 const NAMESPACE = 'dx01v2';
-// Kinds the deployer Role of tx01v2 may write (contract v1). Secrets are written by ESO only.
+// Kinds the deployer Role of tx01v2 may write (docs/CONTRATO.md). Secrets are written by ESO only.
 const DEPLOYER_KINDS = new Set([
   'ConfigMap',
   'Deployment',

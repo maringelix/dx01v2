@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys dx01v2 to the EKS lab cluster of tx01v2 (contract v1, docs/CONTRATO.md).
+# Deploys dx01v2 to the EKS lab cluster of tx01v2 (docs/CONTRATO.md).
 # CLOUD-MUTATING and billable: pushes images to ECR and makes the AWS Load Balancer Controller
 # create an internet-facing ALB. Run it only on purpose, after the tx01v2 apply + platform steps;
 # the teardown is the tx01v2 destroy. Not run in the cloud yet (v2).
@@ -25,7 +25,7 @@ export PATH="$REPO_ROOT/.tools/bin:$PATH"
 
 NAMESPACE=dx01v2
 SSM_PREFIX=/tx01v2/lab
-# Contract v1: every parameter the deploy reads (the harness check contract-app verifies this list).
+# Contract: every parameter the deploy reads (the harness check contract-app verifies this list).
 SSM_NAMES=(
   "$SSM_PREFIX/region"
   "$SSM_PREFIX/cluster-name"
@@ -72,7 +72,7 @@ section() {
 param() { printf '%s' "${PARAM[$SSM_PREFIX/$1]}"; }
 
 expect_param() { # NAME VALUE
-  [[ "$(param "$1")" == "$2" ]] || die "SSM $SSM_PREFIX/$1 is '$(param "$1")' but the manifests expect '$2' (contract v1)"
+  [[ "$(param "$1")" == "$2" ]] || die "SSM $SSM_PREFIX/$1 is '$(param "$1")' but the manifests expect '$2' (docs/CONTRATO.md)"
 }
 
 write_summary() { # RESULT
@@ -142,7 +142,7 @@ read_contract() {
     fi
   done <<<"$out"
   for n in "${SSM_NAMES[@]}"; do
-    [[ -n "${PARAM[$n]:-}" ]] || die "the SSM parameter $n is missing (contract v1, docs/CONTRATO.md)"
+    [[ -n "${PARAM[$n]:-}" ]] || die "the SSM parameter $n is missing (docs/CONTRATO.md)"
   done
   expect_param region "$AWS_REGION"
   expect_param cluster-name "$CONTRACT_CLUSTER"
@@ -153,7 +153,7 @@ read_contract() {
   [[ "$(param ecr/web-url)" =~ ${ECR_URL_PATTERN}web$ ]] || die "SSM $SSM_PREFIX/ecr/web-url is not the URL of the dx01v2/web repository"
   API_IMAGE="$(param ecr/api-url):$GIT_SHA"
   WEB_IMAGE="$(param ecr/web-url):$GIT_SHA"
-  log "contract v1: ${#SSM_NAMES[@]} parameters read and consistent with the manifests"
+  log "contract: ${#SSM_NAMES[@]} parameters read and consistent with the manifests"
 }
 
 push_image() { # COMPONENT IMAGE
@@ -245,7 +245,7 @@ main() {
   preflight
   WORK_DIR="$(mktemp -d)"
   trap cleanup EXIT
-  section "contract v1: SSM parameters $SSM_PREFIX/*"
+  section "contract: SSM parameters $SSM_PREFIX/*"
   read_contract
   section "images dx01v2/api and dx01v2/web, tag $GIT_SHA"
   publish_images
