@@ -6,6 +6,19 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+### Security
+
+- The integration tests drop and recreate tables (`messages`, `schema_migrations`), and with
+  `DB_HOST` set the harness ran them against whatever database `DB_*` pointed at, such as the
+  development database of `docs/RUNBOOK.md`. They now refuse a `DB_NAME` that does not end in `_test`,
+  both in `api/test/integration/helpers.ts` (`requireTestDatabase`, new unit test `test-database`) and
+  in `scripts/harness.sh`; `docs/RUNBOOK.md` shows a separate `dx01v2_test` database.
+- `scripts/deploy-local.sh` refuses any kube context but `kind-tx01v2-local`: a cluster of whoever runs
+  it, left in the current context, never receives the deploy.
+- `docs/RUNBOOK.md` writes the kubeconfig of the cloud lab to its own file
+  (`~/.kube/tx01v2-lab.kubeconfig`): `~/.kube/config` and its current context stay as they were.
+- `deploy/local/tx01v2.ref` follows tx01v2 to the commit where its scripts act only on the lab.
+
 ### Fixed
 
 - `scripts/deploy-local.sh` waits for the Argo CD sync of the commit it pushed: on a redeploy the

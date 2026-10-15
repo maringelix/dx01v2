@@ -56,7 +56,7 @@ Outras variáveis:
 | `HARNESS_VERBOSE=1` | mostra a saída dos checks que passam |
 | `HARNESS_ONLY=<regex>` | roda só os checks cujo nome casa (depuração local; o CI nunca usa), por exemplo `HARNESS_ONLY='^eslint$' scripts/harness.sh static` |
 | `HARNESS_WORK_DIR` | logs, manifests renderizados e caches (padrão `$TMPDIR/dx01v2-harness`) |
-| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | banco dos testes de integração; sem `DB_HOST`, o harness sobe um `postgres:17-alpine` descartável (porta aleatória em 127.0.0.1) e o remove no fim |
+| `DB_HOST`, `DB_PORT`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | banco dos testes de integração; sem `DB_HOST`, o harness sobe um `postgres:17-alpine` descartável (porta aleatória em 127.0.0.1) e o remove no fim; com `DB_HOST`, o `DB_NAME` tem de terminar em `_test` (os testes apagam e recriam as tabelas) |
 | `IMAGE_TAG` | tag das imagens construídas e escaneadas (padrão `e2e`, a que o overlay `local` usa) |
 | `IMAGES_PREBUILT=1` | o estágio `build` confere imagens construídas por fora (CI) em vez de construí-las |
 | `E2E_SKIP_BUILD=1`, `KEEP_CLUSTER=1`, `E2E_DIAGNOSTICS_DIR`, `E2E_KIND_INTERNAL=1` | ver o cabeçalho de `scripts/e2e-kind.sh` |
@@ -89,7 +89,7 @@ Ferramenta nova: adicione-a a `scripts/lib/tools.sh` (URLs oficiais), a `tools/v
     -v dx01v2-nm-root:/work/node_modules -v dx01v2-nm-api:/work/api/node_modules \
     -v dx01v2-nm-web:/work/web/node_modules -v dx01v2-tools:/work/.tools \
     -v /var/run/docker.sock:/var/run/docker.sock --network <rede com o PostgreSQL> \
-    -e DB_HOST=<container do PostgreSQL> -e DB_NAME=... -e DB_USER=... -e DB_PASSWORD \
+    -e DB_HOST=<container do PostgreSQL> -e DB_NAME=dx01v2_test -e DB_USER=... -e DB_PASSWORD \
     <imagem node:24 com o cliente docker> bash -c "make tools && make verify build"
   ```
   Dentro de um container, o PostgreSQL descartável do harness e o `127.0.0.1` publicado pelo kind
@@ -112,6 +112,7 @@ remove tudo isso.
 | `SKIP tool-versions - missing tools` | `make tools` não rodou | `make tools` |
 | `FAIL npm-ci` | `package-lock.json` fora de sincronia com algum `package.json` | `npm install` (gera o lock) e commit dos dois; nunca edite o lock à mão |
 | `FAIL test:api` com `integration tests need DB_HOST...` | sem Docker e sem `DB_*` | inicie o Docker ou exporte `DB_*` para um PostgreSQL 17 |
+| `FAIL test:api` com `DB_NAME '...' does not end in _test` | `DB_*` exportadas para outro banco (o de desenvolvimento, por exemplo) | `env -u DB_HOST make test` (o harness sobe um banco descartável) ou aponte `DB_NAME` para um banco `*_test` |
 | `FAIL test:api` com `ERROR: Coverage for lines (...) does not meet` | código novo sem teste | escreva o teste; nunca baixe o limite |
 | `FAIL trivy-image:*` | CVE HIGH/CRITICAL com correção nova | `docs/SUSTENTACAO.md`, seção 5.6 |
 | `FAIL trivyignore-policy ... expired` | ignore venceu | revise a exceção: corrija ou renove com nova justificativa |
