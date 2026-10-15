@@ -52,6 +52,7 @@ A família do lab (v2):
 | Gatekeeper (o app é admitido pelas políticas do lab), relatórios do Trivy Operator das imagens do app, HPA 2-4 | `verificado no CI` | `make e2e-platform` |
 | Rollout sem downtime: uma versão nova pelo GitOps, nenhuma requisição de um leitor falha durante o rolling update | `verificado no CI` | `make e2e-platform` (sonda `rollout`) |
 | Ensaio de backup + restore do banco; experimentos de chaos com hipótese (um pod da API morto, leituras continuam; 200 ms entre a API e o PostgreSQL, as leituras passam e o trace mostra o atraso) | `verificado no CI` | `make e2e-platform` (sondas `backup`, `chaos`) |
+| As mesmas 18 sondas em 7 GB de memória do Docker: a plataforma no tamanho small (`LOCAL_SIZE=small`), dentro de um Docker-in-Docker sem swap | `verificado no CI` | `make e2e-platform-small` (`scripts/e2e-platform-small.sh`); job `e2e-platform-small` do CI |
 
 As linhas `verificado no CI` rodam em todo pull request, em todo push para a `main` e toda semana
 (jobs do CI na coluna Evidência); a linha do compose é verificada só localmente. A linha da AWS só
@@ -121,7 +122,8 @@ destroy do tx01v2 + checagem de sobras → issue `cloud_run_report`.
 | `make verify` | static + test | antes de cada PR |
 | `make build` | `scripts/harness.sh build`: build npm, imagens, política das imagens, gate do trivy | quando código, Dockerfiles ou dependências mudam |
 | `make e2e` | `scripts/harness.sh e2e`: cluster kind, smoke test, sondas de NetworkPolicy | quando manifests, imagens ou o app mudam |
-| `make e2e-platform` | `scripts/harness.sh platform`: o app na plataforma local completa do tx01v2 (clona o tx01v2 em `deploy/local/tx01v2.ref`), sempre destruída no fim (job `e2e-platform` do CI) | mudanças em manifests, imagens ou no app; precisa de Docker com 8 GB |
+| `make e2e-platform` | `scripts/harness.sh platform`: o app na plataforma local completa do tx01v2 (clona o tx01v2 em `deploy/local/tx01v2.ref`), sempre destruída no fim (job `e2e-platform` do CI) | mudanças em manifests, imagens ou no app; precisa de Docker com 8 GB, ou 7 GB com `LOCAL_SIZE=small` |
+| `make e2e-platform-small` | `scripts/harness.sh platform-small`: o mesmo e2e no tamanho small dentro de um Docker limitado a 7 GB, com o pico de memória e os OOM kills no resumo do job (job `e2e-platform-small` do CI) | pesado, feito para o runner do CI; num notebook rode `LOCAL_SIZE=small make e2e-platform` |
 | `make all` | todos os estágios | antes de um merge importante |
 | `make clean` | remove `.tools/`, saída de build, cobertura, `node_modules` e dados temporários | — |
 

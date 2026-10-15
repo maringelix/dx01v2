@@ -26,6 +26,15 @@ All notable changes to this project are documented here. The format follows
 
 ### Added
 
+- `LOCAL_SIZE=small` for the platform e2e (roadmap R1.8): `scripts/e2e-platform.sh` passes it to the
+  tx01v2 platform, which installs the same components with smaller memory limits, short retention and
+  fewer series and workers. `make e2e-platform-small` (CI job `e2e-platform-small`, not a required
+  check) runs the 18 probes inside a Docker-in-Docker limited to 7 GB without swap and reports the peak
+  memory, the largest containers and any OOM kill. Measured on 2026-10-15: the 18 probes pass at 7 GB in about 14 minutes (4.4 GiB of anonymous
+  memory; in one of four runs across the three pairs the kernel killed the plugin copy of Velero, an
+  init container the kubelet runs again); at 6 GB, the goal of the roadmap, the rollout probe loses requests, so the size
+  stays at 7 GB (decision of Bruno). `deploy/local/tx01v2.ref` follows tx01v2 to the commit with the
+  sizes.
 - Traces with OpenTelemetry ("Observability 2.0", the last step of the v1 roadmap, never started
   there): the API creates a SERVER span per request (named after the route) and a CLIENT span per
   PostgreSQL query inside it (parameterized SQL only), continues the W3C `traceparent` of the Gateway

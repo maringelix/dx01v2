@@ -6,22 +6,24 @@ CD, Gatekeeper, Trivy Operator, Velero, Chaos Mesh) em cima de um kind com ECR, 
 servidor git emulados (`docs/LAB_LOCAL.md` do tx01v2). Este repositório faz o deploy do app nela do
 jeito GitOps e prova o comportamento com sondas. Nada aqui fala com a AWS.
 
-Status: `verificado no CI` (job `e2e-platform`, 18 sondas) e `verificado localmente` em 2026-10-13
-(as 13 sondas de então). As cinco sondas de 2026-10-14 (traces, rollout e chaos do banco) só rodaram
-no CI: a plataforma `full` com o app passa dos 7,65 GiB de memória do Docker Desktop usado aqui.
+Status: `verificado no CI` (job `e2e-platform`, 18 sondas, tamanho padrão; job `e2e-platform-small`,
+as mesmas 18 sondas no tamanho `small` com o Docker limitado a 7 GB) e `verificado localmente` em
+2026-10-13 (as 13 sondas de então). No tamanho padrão, a plataforma `full` com o app passa dos 7,65 GiB
+de memória do Docker Desktop usado no desenvolvimento; no tamanho `small`, cabe em 7 GB (abaixo).
 
 ## Como rodar
 
 ```bash
-make build           # imagens dx01v2-api:e2e e dx01v2-web:e2e (ou deixe o e2e construir)
-make e2e-platform    # sobe o lab do tx01v2, faz o deploy, roda as sondas e destrói tudo
+make build                          # imagens dx01v2-api:e2e e dx01v2-web:e2e (ou deixe o e2e construir)
+make e2e-platform                   # sobe o lab do tx01v2, faz o deploy, roda as sondas e destrói tudo
+LOCAL_SIZE=small make e2e-platform  # o mesmo, com a plataforma no tamanho small (Docker com 7 GB)
 ```
 
 O script clona o tx01v2 no commit de `deploy/local/tx01v2.ref`; com `TX01V2_DIR=<checkout>` ele usa
 um checkout seu, e `TX01V2_REPO=<URL https>` clona outro repositório (o seu fork; no CI, a variável de
 repositório `TX01V2_REPO`, `FORK.md`). `KEEP_LAB=1` mantém o lab no fim (`bash <tx01v2>/scripts/local-lab.sh down` depois).
 Dentro de um contêiner que usa o Docker do host, exporte `LOCAL_KIND_INTERNAL=1`. Precisa de Docker com
-8 GB de memória.
+8 GB de memória, ou 7 GB com `LOCAL_SIZE=small`.
 
 Com o lab do tx01v2 já de pé (`make local-up` lá), o deploy sozinho:
 
@@ -32,6 +34,39 @@ GIT_SHA=$(git rev-parse HEAD) scripts/deploy-local.sh
 
 O `scripts/deploy-local.sh` recusa qualquer contexto do kubectl que não seja `kind-tx01v2-local`: um
 cluster seu que esteja no contexto atual nunca recebe o deploy.
+
+## Tamanho `small` e a prova dos 7 GB
+
+`LOCAL_SIZE=small` chega ao `platform/local/install.sh` do tx01v2: os mesmos componentes, com limites
+de memória menores, retenção curta no Prometheus e no Tempo, menos séries e menos workers
+(`docs/LAB_LOCAL.md` do tx01v2 diz o que muda em cada chart). O app não muda. Um valor diferente de
+`default` ou `small` falha antes de qualquer build.
+
+`make e2e-platform-small` (job `e2e-platform-small` do CI, `scripts/e2e-platform-small.sh`) roda o
+`e2e-platform` com `LOCAL_SIZE=small` dentro de um Docker-in-Docker (`docker:29.9.0-dind`, por digest)
+limitado a 7 GB, sem swap: é o Docker de um notebook com 7 GB para ele. O resultado do job é o do
+e2e, e o resumo do job traz o pico de memória do daemon inteiro, o pico de memória anônima (o cache de
+páginas enche qualquer limite; sem swap, a memória anônima é a que não pode ser devolvida), os maiores
+contêineres e os processos que o kernel matou por falta de memória. Não é check exigido: quem barra o
+merge é o `e2e-platform` no tamanho padrão.
+
+| Plataforma `full` + app | Docker | Resultado |
+|---|---|---|
+| tamanho padrão | 7 GB, sem swap (local, 2026-10-15) | falha: a memória bateu no limite cerca de 825 mil vezes (thrashing), o apiserver reiniciou e os controllers entraram em CrashLoop; nenhum OOM kill |
+| tamanho padrão | runner do CI, 16 GB | passa (job `e2e-platform`) |
+| tamanho `small` | 6 GB, sem swap (CI, 2026-10-15) | falha: 14 das 18 sondas passam, e a de rollout perde 7 de 376 requisições; memória anônima de 4,25 GiB, 4 OOM kills (a cópia do plugin do Velero) |
+| tamanho `small` | 7 GB, sem swap (CI, 2026-10-15) | passa: as 18 sondas em cerca de 14 minutos, memória anônima de 4,4 GiB. Em uma das quatro rodadas dos três pares, o kernel matou duas vezes a cópia do plugin do Velero na instalação (init container BestEffort, que o kubelet roda de novo) |
+| tamanho `small` | 8 GB, sem swap (CI, 2026-10-15) | passa no mesmo tempo, memória anônima de 4,37 GiB |
+
+A meta da R1.8 era 6 GB; o tamanho `small` ficou em 7 GB por decisão do Bruno em 2026-10-15, abaixo
+dos 7,65 GiB do Docker Desktop de desenvolvimento. Os maiores consumidores (pico do working set no job,
+2026-10-15): apiserver do Kubernetes 1248 MiB, controller do Argo CD 306 MiB, Grafana 299 MiB (mais
+163 MiB dos dois sidecars), Prometheus 236 MiB, Trivy Operator 208 MiB, etcd 150 MiB e os dois pods do
+Gatekeeper, 271 MiB; a API do app usa 57 MiB por pod.
+
+O `e2e-platform-small` é pesado: além dos 7 GB, o daemon interno baixa de novo todas as imagens do
+lab. Ele foi feito para o runner do CI; num notebook de 16 GB com editor e navegador abertos, rode
+`LOCAL_SIZE=small make e2e-platform` com o Docker configurado em 7 GB.
 
 ## Como o deploy funciona (`scripts/deploy-local.sh`)
 
