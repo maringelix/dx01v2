@@ -8,6 +8,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Security
 
+- `deploy/local/tx01v2.ref` pins the local platform to the merged tx01v2 R3 commit, so
+  `e2e-platform` and `family-ref` check the integrated infrastructure.
+
 - Contract version 3 with tx01v2, coordinated with [tx01v2#14](https://github.com/maringelix/tx01v2/pull/14):
   the deploy identity now documents the immutable GitHub owner and repository IDs; its workflow uses
   the protected `lab` environment (roadmap R3.15). The version 2 application parameters and tracing
