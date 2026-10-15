@@ -3,7 +3,7 @@
 # inside a Docker daemon limited to SMALL_MEMORY of memory and no swap (Docker-in-Docker): the proof
 # that the platform and this app fit in the Docker memory of a laptop (docs/LAB_LOCAL.md). Harness
 # stage platform-small, CI job e2e-platform-small. It fails when the e2e fails or when any process
-# inside was OOM-killed.
+# inside was OOM-killed, and prints the peak memory of the largest containers.
 # HEAVY: it needs SMALL_MEMORY free on top of everything else the machine runs, and the inner daemon
 # pulls every image of the lab again. It is meant for the CI runner (16 GB). On a 16 GB laptop that
 # also runs an editor and a browser, do not run it: use e2e-platform with LOCAL_SIZE=small.
@@ -20,13 +20,48 @@ DIND_IMAGE="docker:29.9.0-dind@sha256:0b6d18a4a222e71c88be6034926b4f6cde2fc33c22
 # What scripts/e2e-platform.sh and the install-tools.sh of both repositories need inside. Alpine keeps
 # only the latest build of each package in a branch, so the versions follow the pinned base image.
 PACKAGES=(bash curl git make unzip xz jq openssh-client nodejs coreutils findutils grep sed gawk tar procps)
+NODE=tx01v2-local-control-plane
 MEMORY="${SMALL_MEMORY:-6g}"
 NAME="dx01v2-small-$$"
 DIAG_DIR="${E2E_DIAGNOSTICS_DIR:-${TMPDIR:-/tmp}/dx01v2-harness/platform-diagnostics}"
+SAMPLER=""
 
 # -v: the anonymous volume of the inner /var/lib/docker holds every image of the lab (GBs).
 cleanup() {
+  [[ -z "$SAMPLER" ]] || kill "$SAMPLER" 2>/dev/null || :
   docker rm -f -v "$NAME" >/dev/null 2>&1 || :
+}
+
+# Runs inside the Docker-in-Docker container (bash -c "$(declare -f sample_memory); ..."): every 30 s
+# the memory of the whole daemon (in use and anonymous: without swap, the anonymous memory cannot be
+# reclaimed, and the page cache fills any limit); every minute the working set of each container of the
+# kind node (crictl, independent of metrics-server), printing the 12 largest every 5 minutes. The peaks
+# go to /work/anon.max and /work/containers.max.
+# shellcheck disable=SC2317,SC2329 # invoked inside the container through declare -f
+sample_memory() {
+  local node=$1 n=0 anon max=0
+  while sleep 30; do
+    anon="$(sed -n 's/^anon //p' /sys/fs/cgroup/memory.stat)"
+    if ((anon > max)); then
+      max=$anon
+      echo "$max" >/work/anon.max
+    fi
+    printf 'memory: %d MiB in use, %d MiB anonymous\n' "$(($(cat /sys/fs/cgroup/memory.current) / 1048576))" "$((anon / 1048576))"
+    n=$((n + 1))
+    ((n % 2 == 0)) || continue
+    docker exec "$node" crictl ps -o json >/tmp/ps.json 2>/dev/null || continue
+    docker exec "$node" crictl stats -o json >/tmp/stats.json 2>/dev/null || continue
+    jq -r --slurpfile s /tmp/stats.json '
+      ($s[0].stats | map({key: .attributes.id, value: ((.memory.workingSetBytes.value // "0") | tonumber / 1048576 | floor)}) | from_entries) as $mem
+      | .containers[] | [.labels["io.kubernetes.pod.namespace"] + "/" + .labels["io.kubernetes.pod.name"] + "/" + .metadata.name, ($mem[.id] // 0)] | @tsv
+    ' /tmp/ps.json >/tmp/now.tsv || continue
+    cat /work/containers.max /tmp/now.tsv 2>/dev/null |
+      awk -F'\t' '$2 > m[$1] { m[$1] = $2 } END { for (k in m) printf "%s\t%d\n", k, m[k] }' >/tmp/max.tsv
+    mv /tmp/max.tsv /work/containers.max
+    if ((n % 10 == 0)); then
+      sort -t "$(printf '\t')" -k2 -rn /tmp/now.tsv | head -12 | awk -F'\t' '{ printf "  %5d MiB %s\n", $2, $1 }'
+    fi
+  done
 }
 
 gib() {
@@ -34,7 +69,7 @@ gib() {
 }
 
 main() {
-  local rc=0 i peak anon events hits oom summary
+  local rc=0 i peak anon events hits oom summary top
   require_cmd docker tar
   [[ "$MEMORY" =~ ^[0-9]+[mg]$ ]] || die "SMALL_MEMORY must look like 6g or 6144m (got '$MEMORY')"
   trap cleanup EXIT
@@ -52,25 +87,27 @@ main() {
     log "copying dx01v2-api:e2e and dx01v2-web:e2e into the inner Docker"
     docker save dx01v2-api:e2e dx01v2-web:e2e | docker exec -i "$NAME" docker load >/dev/null
   fi
-  # memory.peak counts the page cache, which fills any limit. Without swap the anonymous memory cannot
-  # be reclaimed, so its peak (sampled every 5 s) is what the platform needs.
-  # shellcheck disable=SC2016 # expanded by the shell inside the container
-  docker exec -d "$NAME" sh -c 'max=0; while sleep 5; do
-    a=$(sed -n "s/^anon //p" /sys/fs/cgroup/memory.stat)
-    if [ "$a" -gt "$max" ]; then max=$a; echo "$max" >/work/anon.max; fi; done'
+  docker exec "$NAME" bash -c "$(declare -f sample_memory); sample_memory $NODE" &
+  SAMPLER=$!
   docker exec -e LOCAL_SIZE=small -e E2E_SKIP_BUILD="${E2E_SKIP_BUILD:-0}" -e TX01V2_REPO="${TX01V2_REPO:-}" \
     -e E2E_DIAGNOSTICS_DIR=/work/diagnostics "$NAME" bash -c 'cd /work/dx01v2 &&
       git config --global --add safe.directory "*" &&
       bash scripts/install-tools.sh kubectl >/dev/null && bash scripts/e2e-platform.sh' || rc=$?
+  kill "$SAMPLER" 2>/dev/null || :
+  SAMPLER=""
   peak="$(docker exec "$NAME" cat /sys/fs/cgroup/memory.peak 2>/dev/null)" || peak=0
   anon="$(docker exec "$NAME" cat /work/anon.max 2>/dev/null)" || anon=0
   events="$(docker exec "$NAME" cat /sys/fs/cgroup/memory.events 2>/dev/null)" || events=""
+  # shellcheck disable=SC2016 # expanded by the shell inside the container
+  top="$(docker exec "$NAME" sh -c 'sort -t "$(printf "\t")" -k2 -rn /work/containers.max | head -20' 2>/dev/null |
+    awk -F'\t' '{ printf "  %5d MiB %s\n", $2, $1 }')" || top=""
   hits="$(awk '$1 == "max" { print $2 }' <<<"$events")"
   oom="$(awk '$1 == "oom_kill" { print $2 }' <<<"$events")"
   summary="Docker limited to $MEMORY: peak $(gib "$peak") (anonymous $(gib "$anon")), limit reached ${hits:-?} times, OOM kills ${oom:-?}"
+  printf 'largest containers of the kind node (peak working set):\n%s\n' "$top"
   printf 'SUMMARY: %s\n' "$summary"
   if [[ -n "${GITHUB_STEP_SUMMARY:-}" ]]; then
-    printf '### Platform e2e, size small\n\n%s; e2e exit code %s\n' "$summary" "$rc" >>"$GITHUB_STEP_SUMMARY"
+    printf '### Platform e2e, size small\n\n%s; e2e exit code %s\n\n```\n%s\n```\n' "$summary" "$rc" "$top" >>"$GITHUB_STEP_SUMMARY"
   fi
   if ((rc == 0)) && [[ "$oom" != 0 ]]; then
     log "error: OOM kills inside the Docker daemon (${oom:-unknown}): the platform does not fit in $MEMORY"
@@ -80,6 +117,7 @@ main() {
     mkdir -p "$DIAG_DIR"
     docker cp "$NAME:/work/diagnostics/." "$DIAG_DIR/" >/dev/null 2>&1 || :
     printf '%s\n' "$events" >"$DIAG_DIR/memory.events"
+    printf '%s\n' "$top" >"$DIAG_DIR/largest-containers.txt"
     docker exec "$NAME" dmesg 2>/dev/null | grep -iE 'out of memory|oom-kill|killed process' >"$DIAG_DIR/oom-kills.txt" || :
     log "diagnostics: $DIAG_DIR"
   fi

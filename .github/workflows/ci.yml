@@ -244,6 +244,11 @@ jobs:
     needs: images
     runs-on: ubuntu-24.04
     timeout-minutes: 60
+    # Measurement round of roadmap R1.8: the same run with three limits at once.
+    strategy:
+      fail-fast: false
+      matrix:
+        memory: [6g, 7g, 8g]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -259,6 +264,7 @@ jobs:
 
       - run: make e2e-platform-small
         env:
+          SMALL_MEMORY: ${{ matrix.memory }}
           E2E_SKIP_BUILD: '1'
           E2E_DIAGNOSTICS_DIR: ${{ runner.temp }}/platform-diagnostics
           TX01V2_REPO: ${{ vars.TX01V2_REPO }}
@@ -280,7 +286,7 @@ jobs:
         if: failure()
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
-          name: platform-small-diagnostics
+          name: platform-small-diagnostics-${{ matrix.memory }}
           path: ${{ runner.temp }}/platform-diagnostics
           retention-days: 7
           if-no-files-found: ignore
