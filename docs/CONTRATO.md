@@ -1,7 +1,9 @@
-# Contrato tx01v2 <-> dx01v2 — versão 2 (2026-10-14)
+# Contrato tx01v2 <-> dx01v2 — versão 3 (2026-10-15)
 
-Versão 2: o OpenTelemetry Collector da camada de plataforma do tx01v2 recebe os traces do app. A versão
-1 (2026-10-10) não tinha traces.
+Versão 3: o subject OIDC do deploy inclui os IDs imutáveis do dono e do repositório; o environment
+`lab` só permite deploy pela `main` (R3.15). A versão 2 (2026-10-14) adicionou traces do app pelo
+OpenTelemetry Collector da camada de plataforma do tx01v2 ao AWS X-Ray; a versão 1 (2026-10-10) não
+tinha traces.
 
 Interface entre a infraestrutura (`tx01v2`) e a aplicação (este repositório), na parte que o app usa.
 A fonte da verdade é o

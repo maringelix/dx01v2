@@ -37,6 +37,7 @@ The lab family (v2):
 | Dockerfiles, workflows and scripts (hadolint, actionlint, shellcheck) | `verified in CI` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
 | Kubernetes manifests: kustomize render + kubeconform strict (local, aws, aws-https), contract and hardening assertions, trivy config | `verified in CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
 | Secret scan and repository policies (no real identifiers, pinned actions and images, v1 regressions) | `verified in CI` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
+| GitHub deploy identity uses the protected `lab` environment and the immutable owner/repository subject expected by tx01v2 | `verified in CI` | `policy-workflows`; coordinated tx01v2#14 OIDC tests |
 | API unit + integration tests against a real PostgreSQL 17 (coverage gate: lines >= 80 %, branches >= 70 %) | `verified in CI` | `make test` (`test:api`); CI job `test` |
 | Web tests with Testing Library + jsdom (coverage gate: lines >= 70 %) | `verified in CI` | `make test` (`test:web`); CI job `test` |
 | Images: build, numeric non-root user, no npm or shell in the API runtime, trivy HIGH/CRITICAL gate | `verified in CI` | `make build`; CI job `images` |
@@ -138,7 +139,7 @@ All docs are in Brazilian Portuguese.
 | [FORK.md](FORK.md) | fork the lab: what GitHub does not copy, the local lab, your own cloud account |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagrams (local, kind, AWS), decisions, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, errors, curl examples |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v2 (app side; source of truth in tx01v2) |
+| [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v3 (app side; source of truth in tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | local development, compose, kind e2e, AWS deploy |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | rules, enforcement, exceptions, limits |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, strict mode, troubleshooting |
