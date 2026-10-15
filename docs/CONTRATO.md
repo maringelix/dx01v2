@@ -49,7 +49,11 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 
 | Papel | `sub` permitido (StringEquals, audience `sts.amazonaws.com`) |
 |---|---|
-| `dx01v2-gha-deploy` | `repo:<owner>/dx01v2:environment:lab` (dono configurável no tx01v2, `github_owner`, sem padrão) |
+| `dx01v2-gha-deploy` | `repo:<owner>@<owner id>/dx01v2@<repo id>:environment:lab` (dono e IDs configuráveis no tx01v2: `github_owner`, `github_owner_id`, `dx01v2_repository_id`, sem padrão) |
+
+É o `sub` imutável do GitHub, o dos repositórios criados depois de 2026-07-15 (um fork também): leva o ID
+numérico do dono e o do repositório, então um nome de conta apagado e registrado de novo não herda o
+lab. O environment `lab` só implanta a partir de `main`.
 
 Por isso o job do `deploy-aws.yml` usa `environment: lab` (o check `policy-workflows` exige).
 Permissões de `dx01v2-gha-deploy`: `ecr:GetAuthorizationToken` em `*`; push/pull apenas nos dois

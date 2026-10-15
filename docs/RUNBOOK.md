@@ -117,6 +117,9 @@ Actions > `deploy-aws` > Run workflow (branch `main`) e aprove o environment `la
 5. espera os ExternalSecrets `db-credentials` e `app-secrets`, os rollouts e o hostname do ALB;
 6. roda `e2e/smoke.mjs` pelo ALB (até 15 minutos de espera pelo DNS e pelos targets;
    `SMOKE_BEHIND_WAF=1`, porque o WAF bloqueia corpos acima de 8 KB com 403) e escreve o resumo do job.
+   Sem `ALB_CERTIFICATE_ARN` o ALB só fala HTTP: o token de admin não é lido nem enviado, e o smoke
+   test pula a chamada `DELETE` com o token (`SKIP` no resumo; a mensagem do teste fica até o
+   destroy). Com HTTPS, o smoke test faz o `DELETE` com o token.
 
 A partir de um laptop (credenciais de um principal em `app_deployer_principal_arns`, working tree
 limpo, porque a tag é o SHA do commit):
