@@ -75,9 +75,9 @@ pointing to the original repositories: change them if you like, nothing depends 
 Only after tx01v2 is applied in your account ([its FORK.md](https://github.com/maringelix/tx01v2/blob/main/FORK.md),
 step 7). Its bootstrap prints the repository variables of this fork (`github_variables_dx01v2`:
 `AWS_REGION` and `AWS_DEPLOY_ROLE_ARN`); then run `deploy-aws` from the Actions tab and approve the
-`lab` environment. The workflow builds and pushes the images, applies the manifests and runs the smoke
-test through the load balancer: [docs/RUNBOOK.md](docs/RUNBOOK.md), sections 5 to 9. Destroy the lab
-from tx01v2 on the same day.
+`lab` environment. The workflow builds and pushes the images, publishes the GitOps revision, waits
+for Argo CD and runs the smoke test through the load balancer: [docs/RUNBOOK.md](docs/RUNBOOK.md),
+sections 5 to 9. Destroy the lab from tx01v2 on the same day.
 
 Your fork is public, and so are its workflow logs: never paste credentials into an issue or a pull
 request.

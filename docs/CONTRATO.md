@@ -1,9 +1,9 @@
-# Contrato tx01v2 <-> dx01v2 — versão 3 (2026-10-15)
+# Contrato tx01v2 <-> dx01v2 — versão 4 (2026-10-16)
 
-Versão 3: o subject OIDC do deploy inclui os IDs imutáveis do dono e do repositório; o environment
-`lab` só permite deploy pela `main` (R3.15). A versão 2 (2026-10-14) adicionou traces do app pelo
-OpenTelemetry Collector da camada de plataforma do tx01v2 ao AWS X-Ray; a versão 1 (2026-10-10) não
-tinha traces.
+Versão 4: a camada `full` integra o app ao Istio ambient e ao Gatekeeper e registra no Argo CD a
+revisão `gitops/aws`; o grupo `dx01v2-deployers` pode pedir refresh da Application `dx01v2` (R4.1/R4.4).
+A versão 3 (2026-10-15) fixou o subject OIDC aos IDs imutáveis e restringiu deploy à `main`; a versão
+2 (2026-10-14) adicionou traces do app pelo Collector ao AWS X-Ray.
 
 Interface entre a infraestrutura (`tx01v2`) e a aplicação (este repositório), na parte que o app usa.
 A fonte da verdade é o
@@ -46,6 +46,14 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 - `networking.k8s.io`: ingresses, networkpolicies → CRUD completo
 - `autoscaling`: horizontalpodautoscalers → CRUD completo; `policy`: poddisruptionbudgets → CRUD completo
 - `external-secrets.io`: externalsecrets → CRUD completo
+
+Com o perfil `full` do `tx01v2`, o Argo CD é o dono dos manifests do app. O deploy configura o caminho,
+as imagens e os valores reais em `spec.source.kustomize` da Application `dx01v2` no namespace `argocd`;
+em seguida, publica o commit do app e `params.env` copiado do exemplo na branch `gitops/aws` e pede
+refresh ao Argo CD. O app pai ignora somente `spec.source.path` e `spec.source.kustomize` dessa
+Application e usa `RespectIgnoreDifferences=true`. Para um cluster sem Argo CD, execute o script
+localmente com `DEPLOY_MODE=push`; o workflow do Actions sempre usa GitOps. A branch pública não
+recebe IDs reais da conta ou do projeto.
 
 ## Confiança OIDC do GitHub
 

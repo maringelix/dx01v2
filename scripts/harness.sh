@@ -54,7 +54,9 @@ REQUIRED_FILES=(
   tools/versions.env tools/checksums.txt
   scripts/install-tools.sh scripts/update-tool-checksums.sh scripts/harness.sh scripts/repo-guardrails.sh
   scripts/dev-env.sh scripts/compose-smoke.sh scripts/e2e-kind.sh scripts/deploy-aws.sh scripts/render-k8s.sh
+  scripts/publish-gitops.sh scripts/render-gitops-application.mjs scripts/check-gitops-renderer.mjs
   deploy/k8s/components/aws/params.example.env
+  deploy/k8s/overlays/aws/gitops-revision.yaml deploy/k8s/overlays/aws-https/gitops-revision.yaml
 )
 STABLE_CI_JOBS=(static test images e2e e2e-platform)
 
@@ -387,8 +389,9 @@ check_policy_workflows() {
     }
   done
   if ! grep -qE '^  workflow_dispatch:' .github/workflows/deploy-aws.yml ||
-    grep -qE '^  (push|pull_request|pull_request_target|schedule|workflow_run):' .github/workflows/deploy-aws.yml; then
-    echo "deploy-aws.yml must be workflow_dispatch only (cloud workflow)"
+    grep -qE '^  (push|pull_request|pull_request_target|schedule|workflow_run):' .github/workflows/deploy-aws.yml ||
+    grep -qE '^    inputs:' .github/workflows/deploy-aws.yml; then
+    echo "deploy-aws.yml must be workflow_dispatch only, without inputs (cloud workflow)"
     rc=1
   fi
   grep -qE '^    environment: lab$' .github/workflows/deploy-aws.yml || {
@@ -545,7 +548,7 @@ check_kubeconform() {
 
 # The contract (docs/CONTRATO.md): manifests and the deploy script use exactly the agreed names.
 check_contract_app() {
-  local dir="$HARNESS_WORK_DIR/k8s-contract" rc=0 name
+  local dir="$HARNESS_WORK_DIR/k8s-contract" rc=0 name overlay example
   need kubectl node
   [[ -d node_modules ]] || skip "node_modules is missing (check npm-ci)"
   render_overlays "$dir"
@@ -567,6 +570,30 @@ check_contract_app() {
     echo "scripts/deploy-aws.sh must build the rds-ca ConfigMap from the official RDS bundle"
     rc=1
   }
+  example=deploy/k8s/components/aws/params.example.env
+  mkdir -p "$dir/gitops-patches"
+  for overlay in aws aws-https; do
+    if node scripts/render-gitops-application.mjs aws "$overlay" "$example" "$example" \
+      >"$dir/gitops-patches/$overlay.json"; then
+      node scripts/check-gitops-renderer.mjs "$dir/gitops-patches/$overlay.json" "$dir/$overlay.yaml" || rc=1
+    else
+      rc=1
+    fi
+  done
+  expected_mode="DEPLOY_MODE=\"\${DEPLOY_MODE:-gitops}\""
+  if ! grep -qF 'DEPLOY_MODE: gitops' .github/workflows/deploy-aws.yml ||
+    ! grep -qF 'contents: write' .github/workflows/deploy-aws.yml ||
+    grep -qE '^    inputs:' .github/workflows/deploy-aws.yml ||
+    ! grep -qF "$expected_mode" scripts/deploy-aws.sh; then
+    echo "deploy-aws must default to the GitOps branch publishing mode"
+    rc=1
+  fi
+  expected_push="git -C \"\$tmp/repo\" push --quiet origin \"HEAD:refs/heads/\$branch\""
+  if ! grep -qF "$expected_push" scripts/publish-gitops.sh ||
+    grep -q -- '--force' scripts/publish-gitops.sh; then
+    echo "publish-gitops.sh must push the cloud branch without force"
+    rc=1
+  fi
   return "$rc"
 }
 

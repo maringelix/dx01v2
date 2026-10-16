@@ -5,6 +5,7 @@ kind: Kustomization
 namespace: dx01v2
 resources:
   - ../../base
+  - gitops-revision.yaml
 components:
   - ../../components/aws
   - ../../components/aws-https

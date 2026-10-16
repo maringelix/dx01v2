@@ -5,10 +5,19 @@ All notable changes to this project are documented here. The format follows
 [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## [Unreleased]
+### Added
+
+- Cloud deploy now publishes the app source revision to `gitops/aws` with example parameters, then
+  waits for Argo CD to report that exact revision `Synced` and `Healthy`. Direct push remains
+  available through the script when Argo CD is not managing the app; the Actions workflow always
+  uses GitOps.
+- Contract version 4 with tx01v2 records the R4 Argo CD Application and refresh permission; cloud
+  values are configured on the live Application while the public branch contains only example parameters.
+
 
 ### Security
 
-- `deploy/local/tx01v2.ref` pins the local platform to the merged tx01v2 R3 commit, so
+- `deploy/local/tx01v2.ref` pins the local platform to the merged tx01v2 R4 commit, so
   `e2e-platform` and `family-ref` check the integrated infrastructure.
 
 - Contract version 3 with tx01v2, coordinated with [tx01v2#14](https://github.com/maringelix/tx01v2/pull/14):

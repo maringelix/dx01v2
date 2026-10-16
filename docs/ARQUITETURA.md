@@ -68,7 +68,7 @@ flowchart LR
   end
   api -->|"TLS verify-full (ConfigMap rds-ca)"| rds[("RDS PostgreSQL 17")]
   sm["Secrets Manager"] --> eso
-  gha["deploy-aws (OIDC dx01v2-gha-deploy)"] -->|"SSM, ECR, kubectl apply -k"| eks
+  gha["deploy-aws (OIDC, workflow_dispatch)"] -->|"SSM, ECR, branch gitops/aws, Argo CD"| eks
 ```
 
 O namespace, o RBAC do deployer, o ClusterSecretStore, o controller do ALB, o WAF e o RDS são do
