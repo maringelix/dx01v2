@@ -129,19 +129,10 @@ api_post /api/qualitygates/create_condition \
   --data-urlencode 'metric=coverage' \
   --data-urlencode 'op=LT' \
   --data-urlencode 'error=80' >/dev/null
-gate_list="$(sonar_request 'list quality gates' -H "Authorization: Bearer $admin_token" \
-  "$host/api/qualitygates/list")"
-if ! gate_id="$(jq -er --arg name "$fixture_gate" \
-  '.qualitygates[]? | select(.name == $name) | .id | select((type == "string" and length > 0) or type == "number") | tostring' \
-  <<<"$gate_list")"; then
-  available_gates="$(jq -c '[.qualitygates[]? | {name, id}]' <<<"$gate_list" 2>/dev/null || echo 'unrecognized response')"
-  printf 'error: created fixture quality gate %s has no ID in the API list; available gates: %s\n' \
-    "$fixture_gate" "$available_gates" >&2
-  exit 1
-fi
 api_post /api/qualitygates/select \
-  --data-urlencode "gateId=$gate_id" \
+  --data-urlencode "gateName=$fixture_gate" \
   --data-urlencode "projectKey=$SONAR_FIXTURE_PROJECT" >/dev/null
+echo "Associated the disposable fixture project with quality gate $fixture_gate."
 
 {
   printf 'SONAR_ADMIN_TOKEN=%s\n' "$admin_token"
