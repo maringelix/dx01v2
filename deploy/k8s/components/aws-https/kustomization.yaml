@@ -1,5 +1,5 @@
-# Optional HTTPS listener (contract: only when an ACM certificate ARN is supplied). Use after
-# components/aws, which provides the deploy-params ConfigMap (ALB_CERTIFICATE_ARN). HTTP 80
+# HTTPS listener and host (contract: only when Route53 DNS and ACM are enabled). Use after
+# components/aws, which provides the deploy-params ConfigMap. HTTP 80
 # redirects to 443; behind HTTPS the web nginx starts sending HSTS (X-Forwarded-Proto: https).
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
@@ -20,6 +20,9 @@ patches:
       - op: add
         path: /metadata/annotations/alb.ingress.kubernetes.io~1certificate-arn
         value: replaced-from-deploy-params
+      - op: add
+        path: /spec/rules/0/host
+        value: app.example.org
 replacements:
   - source:
       kind: ConfigMap
@@ -31,3 +34,13 @@ replacements:
           name: dx01v2
         fieldPaths:
           - metadata.annotations.[alb.ingress.kubernetes.io/certificate-arn]
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.APP_DOMAIN_NAME
+    targets:
+      - select:
+          kind: Ingress
+          name: dx01v2
+        fieldPaths:
+          - spec.rules.0.host

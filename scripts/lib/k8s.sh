@@ -26,6 +26,7 @@ declare -A K8S_PARAM_PATTERN=(
   [WAF_ACL_ARN]='^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[A-Za-z0-9_-]+/[0-9a-f-]{36}$'
   [VPC_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
   [ALB_CERTIFICATE_ARN]='^(arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[0-9a-f-]{36})?$'
+  [APP_DOMAIN_NAME]='^(disabled|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+)$'
 )
 
 # k8s_validate_params FILE [PATTERNS] -> fails unless FILE has exactly the known keys with valid
@@ -59,6 +60,19 @@ k8s_validate_params() {
       rc=1
     }
   done
+  if [[ -n "${seen[APP_DOMAIN_NAME]:-}" && -n "${seen[ALB_CERTIFICATE_ARN]:-}" ]]; then
+    if [[ "$(sed -n 's/^APP_DOMAIN_NAME=//p' "$file")" == disabled ]]; then
+      [[ -z "$(sed -n 's/^ALB_CERTIFICATE_ARN=//p' "$file")" ]] || {
+        log "params: ALB_CERTIFICATE_ARN must be empty when APP_DOMAIN_NAME is disabled"
+        rc=1
+      }
+    else
+      [[ -n "$(sed -n 's/^ALB_CERTIFICATE_ARN=//p' "$file")" ]] || {
+        log "params: ALB_CERTIFICATE_ARN is required when APP_DOMAIN_NAME is enabled"
+        rc=1
+      }
+    fi
+  fi
   return "$rc"
 }
 

@@ -1,4 +1,8 @@
-# Contrato tx01v2 <-> dx01v2 — versão 4 (2026-10-16)
+# Contrato tx01v2 <-> dx01v2 — versão 5 (2026-10-16)
+
+Versão 5 recebe do tx01v2 a configuração opcional de Route53/ACM: o deploy lê quatro valores DNS
+adicionais no SSM, escolhe `aws-https` pelo contrato e define o hostname do Ingress sem variáveis
+manuais de certificado ou URL (R8.1).
 
 Versão 4: a camada `full` integra o app ao Istio ambient e ao Gatekeeper e registra no Argo CD a
 revisão `gitops/aws`; o grupo `dx01v2-deployers` pode pedir refresh da Application `dx01v2` (R4.1/R4.4).
@@ -18,7 +22,7 @@ repositórios e incremento da versão.
 | Nomes de Services, portas, probes, Secrets, ConfigMap, Ingress (classe, anotações, rotas, health checks), ExternalSecrets, HPA, NetworkPolicies, só tipos que a Role `dx01v2-deployer` pode escrever | check `contract-app` (`scripts/check-manifests.mjs` sobre os overlays renderizados) | `verificado localmente` |
 | Endpoint OTLP da versão 2 no ConfigMap da API e NetworkPolicy só até o Collector (namespace `observability`, porta 4318) | check `contract-app` | `verificado localmente` |
 | Manifests válidos para Kubernetes 1.36 e para o CRD `ExternalSecret` (`external-secrets.io/v1`) | check `kubeconform` (estrito) | `verificado localmente` |
-| O deploy lê exatamente os 10 parâmetros SSM abaixo, com o prefixo `/tx01v2/lab`, e cria o `rds-ca` a partir do bundle oficial | check `contract-app` (greps em `scripts/deploy-aws.sh`) | `verificado localmente` |
+| O deploy lê exatamente os 14 parâmetros SSM abaixo, com o prefixo `/tx01v2/lab`, e cria o `rds-ca` a partir do bundle oficial | check `contract-app` (greps em `scripts/deploy-aws.sh`) | `verificado em CI` após merge |
 | Formatos dos valores vindos do SSM (URLs do ECR, ARN do WAF, CIDR da VPC, ARN do ACM) | `k8s_validate_params` em `scripts/lib/k8s.sh` (renderização com `params.example.env`) | `verificado localmente` |
 | Valores fixos (`cluster-name`, nomes dos segredos, ClusterSecretStore) iguais aos do SSM | `scripts/deploy-aws.sh` falha antes de aplicar qualquer coisa | `não executado em nuvem (v2)` |
 | Comportamento real na AWS | `docs/RUNBOOK.md` | `não executado em nuvem (v2)` |
@@ -52,7 +56,8 @@ as imagens e os valores reais em `spec.source.kustomize` da Application `dx01v2`
 em seguida, publica o commit do app e `params.env` copiado do exemplo na branch `gitops/aws` e pede
 refresh ao Argo CD. O app pai ignora somente `spec.source.path` e `spec.source.kustomize` dessa
 Application e usa `RespectIgnoreDifferences=true`. Para um cluster sem Argo CD, execute o script
-localmente com `DEPLOY_MODE=push`; o workflow do Actions sempre usa GitOps. A branch pública não
+localmente com `DEPLOY_MODE=push`; no Actions, `auto` seleciona GitOps quando a Application existe e
+aplica direto quando a instalação é `core`. A branch pública não
 recebe IDs reais da conta ou do projeto.
 
 ## Confiança OIDC do GitHub
@@ -87,6 +92,10 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 | `db/secret-name` | `tx01v2-lab/db/app` | conferido contra o ExternalSecret `db-credentials` |
 | `app/admin-token-secret-name` | `tx01v2-lab/app/admin-token` | conferido contra o ExternalSecret `app-secrets` |
 | `eso/cluster-secret-store` | `aws-secrets-manager` | conferido contra o `secretStoreRef` dos ExternalSecrets |
+| `dns/enabled` | `true` ou `false` | escolhe `aws-https` ou o overlay HTTP-only |
+| `dns/domain-name` | hostname público do app ou `disabled` | host do Ingress e URL do smoke test |
+| `dns/zone-id` | hosted zone pública Route53 ou `disabled` | conferido antes de renderizar, não altera a zona no deploy |
+| `dns/acm-certificate-arn` | certificado validado ou `disabled` | listener HTTPS do ALB |
 
 ## Secrets Manager (criados pelo tx01v2; valores nunca no state/plan)
 
@@ -97,6 +106,8 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 ## Camada de plataforma (instalada pelo tx01v2)
 
 - AWS Load Balancer Controller em `kube-system`, IngressClass `alb`.
+- Quando DNS está habilitado, ExternalDNS mantém o A record do hostname e o TXT de ownership na única
+  hosted zone do contrato; o chart é instalado pelo tx01v2 e seu IAM é limitado a esses dois nomes.
 - External Secrets Operator no namespace `external-secrets`; ClusterSecretStore `aws-secrets-manager`
   (provider aws, SecretsManager, região do SSM; só aceita ExternalSecrets do namespace `dx01v2`).
 - Add-ons do EKS: vpc-cni (com enforcement de network policy), kube-proxy, coredns,
@@ -113,6 +124,8 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
   `https://truststore.pki.rds.amazonaws.com/<region>/<region>-bundle.pem`); local `DB_SSL_MODE=disable`.
   Com `APP_ENV=lab` a API recusa qualquer modo diferente de `verify-full`.
 - Services: `api` (porta 3000 http, 9464 métricas), `web` (porta 8080).
+- Com DNS habilitado, o Ingress `aws-https` define o hostname do contrato, associa o certificado ACM
+  e redireciona HTTP para HTTPS; sem DNS permanece HTTP-only. O smoke test usa a URL do contrato.
 - Ingress (só AWS): classe `alb`, `internet-facing`, `target-type: ip`, HTTP 80 (HTTPS só se um ARN
   de certificado ACM for informado: overlay `aws-https`), anotação
   `alb.ingress.kubernetes.io/wafv2-acl-arn` vinda do SSM; `/api` → `api:3000`, `/` → `web:8080`;

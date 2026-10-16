@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Added
 
+- R8.1 AWS DNS/TLS integration: the deployment consumes the v5 tx01v2 SSM contract, selects HTTPS
+  only when Route53 and ACM are enabled, routes the configured hostname, and derives its smoke URL
+  from that contract. No manually supplied certificate ARN or DNS URL is needed.
+
 - R7 DevSecOps gates: CodeQL `security-extended` with a fail-closed SARIF severity threshold, a real
   SonarQube Community Build Quality Gate with LCOV and a negative coverage fixture, Trivy dependency
   scanning, OWASP ZAP Baseline against a disposable local Compose deployment, and a Gitleaks check

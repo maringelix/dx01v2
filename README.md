@@ -43,7 +43,7 @@ The lab family (v2):
 | Images: build, numeric non-root user, no npm or shell in the API runtime, trivy HIGH/CRITICAL gate | `verified in CI` | `make build`; CI job `images` |
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
-| AWS deploy (verified GHCR release, digest promotion to ECR, EKS of tx01v2, GitOps, ExternalSecrets, ALB + WAF, traces to X-Ray, smoke test) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| AWS deploy (verified GHCR release, digest promotion to ECR, EKS of tx01v2, GitOps, ExternalSecrets, ALB + WAF, optional Route53/ACM HTTPS, traces to X-Ray, contract-driven smoke test) | `implemented as code; not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
@@ -80,8 +80,8 @@ flowchart LR
 - Local (compose) and kind: one reverse proxy (web nginx) in front of the API (`TRUST_PROXY_HOPS=1`).
 - AWS: the ALB (with the WAF of tx01v2) routes `/api` to the API and `/` to the web; secrets come
   from Secrets Manager through External Secrets; the namespace, IAM and RDS belong to tx01v2. The
-  deploy workflow publishes the source revision to `gitops/aws` for Argo CD; the script also
-  supports direct push for clusters without Argo CD, while the Actions workflow always uses GitOps.
+  deploy workflow detects whether the Argo CD Application exists and selects GitOps or direct apply;
+  choose `auto`, `gitops` or `push` in the workflow when deploying a fork.
 - Design decisions, diagrams per environment and the v1 → v2 table: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Quick start (free, local)

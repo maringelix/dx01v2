@@ -56,6 +56,7 @@ REQUIRED_FILES=(
   scripts/install-tools.sh scripts/update-tool-checksums.sh scripts/harness.sh scripts/repo-guardrails.sh
   scripts/dev-env.sh scripts/compose-smoke.sh scripts/e2e-kind.sh scripts/deploy-aws.sh scripts/render-k8s.sh
   scripts/publish-gitops.sh scripts/render-gitops-application.mjs scripts/check-gitops-renderer.mjs
+  scripts/lib/deploy-mode.sh scripts/tests/deploy-mode.sh
   scripts/sonar-bootstrap.sh scripts/sonar-service.sh scripts/install-sonar-scanner.sh scripts/test-sonar-gate.sh
   scripts/check-codeql-sarif.mjs scripts/test-gitleaks-gate.sh scripts/dast-zap.sh
   scripts/verify-ci-image-artifact.sh scripts/publish-ghcr-images.sh
@@ -587,7 +588,8 @@ check_contract_app() {
     local="$dir/local.yaml" aws="$dir/aws.yaml" aws-https="$dir/aws-https.yaml" \
     local-platform="$dir/local-platform.yaml" || rc=1
   for name in region cluster-name vpc-id vpc-cidr ecr/api-url ecr/web-url waf/acl-arn db/secret-name \
-    app/admin-token-secret-name eso/cluster-secret-store; do
+    app/admin-token-secret-name eso/cluster-secret-store dns/enabled dns/domain-name dns/zone-id \
+    dns/acm-certificate-arn; do
     grep -qF "\"\$SSM_PREFIX/$name\"" scripts/deploy-aws.sh || {
       echo "scripts/deploy-aws.sh must read the SSM parameter /tx01v2/lab/$name (docs/CONTRATO.md)"
       rc=1
@@ -637,11 +639,12 @@ NODE
   else
     rc=1
   fi
-  expected_mode="DEPLOY_MODE=\"\${DEPLOY_MODE:-gitops}\""
-  if ! grep -qF 'DEPLOY_MODE: gitops' .github/workflows/deploy-aws.yml ||
+  expected_mode="DEPLOY_MODE=\"\${DEPLOY_MODE:-auto}\""
+  if ! grep -qF 'default: auto' .github/workflows/deploy-aws.yml ||
+    ! grep -qF "DEPLOY_MODE: \${{ inputs.deploy_mode }}" .github/workflows/deploy-aws.yml ||
     ! grep -qF 'contents: write' .github/workflows/deploy-aws.yml ||
     ! grep -qF "$expected_mode" scripts/deploy-aws.sh; then
-    echo "deploy-aws must default to the GitOps branch publishing mode"
+    echo "deploy-aws must choose GitOps when the Argo CD Application exists and support direct apply for core"
     rc=1
   fi
   expected_push="git -C \"\$tmp/repo\" push --quiet origin \"HEAD:refs/heads/\$branch\""
@@ -653,6 +656,10 @@ NODE
     rc=1
   fi
   return "$rc"
+}
+
+check_deploy_mode() {
+  bash scripts/tests/deploy-mode.sh
 }
 
 check_trivy_config() {
@@ -920,6 +927,7 @@ register_checks() {
   register static policy-workflows check_policy_workflows
   register static policy-images check_policy_images
   register static policy-app check_policy_app
+  register static deploy-mode check_deploy_mode
   register static trivyignore-policy check_trivyignore_policy
   register static npm-ci check_npm_ci
   register static eslint check_eslint

@@ -80,6 +80,7 @@ for (const [name, cidrPath] of [
   addPatch('NetworkPolicy', name, cidrPath, required(actual, 'VPC_CIDR'));
 }
 if (overlay === 'aws-https') {
+  addPatch('Ingress', 'dx01v2', '/spec/rules/0/host', required(actual, 'APP_DOMAIN_NAME'));
   addPatch(
     'Ingress',
     'dx01v2',

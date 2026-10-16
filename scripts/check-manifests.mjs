@@ -319,10 +319,12 @@ function awsChecks(overlay, objs, params, https) {
       params.ALB_CERTIFICATE_ARN,
       `${overlay}: certificate from params`,
     );
+    eq(ingress?.spec?.rules?.[0]?.host, params.APP_DOMAIN_NAME, `${overlay}: hostname from tx01v2 contract`);
     eq(a['alb.ingress.kubernetes.io/ssl-redirect'], '443', `${overlay}: HTTP -> HTTPS redirect`);
   } else {
     eq(a['alb.ingress.kubernetes.io/listen-ports'], '[{"HTTP": 80}]', `${overlay}: listeners`);
     check(a['alb.ingress.kubernetes.io/certificate-arn'] === undefined, `${overlay}: no certificate without HTTPS`);
+    check(ingress?.spec?.rules?.[0]?.host === undefined, `${overlay}: no public hostname without HTTPS`);
   }
   eq(
     (ingress?.spec?.rules?.[0]?.http?.paths ?? []).map((p) => [

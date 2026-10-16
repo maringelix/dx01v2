@@ -10,6 +10,15 @@ on:
         description: Successful publish-images workflow run id for the release to deploy
         required: true
         type: string
+      deploy_mode:
+        description: Use Argo CD when available, or force a deployment path
+        required: true
+        default: auto
+        type: choice
+        options:
+          - auto
+          - gitops
+          - push
 
 permissions:
   contents: read
@@ -74,9 +83,7 @@ jobs:
       packages: read
     env:
       AWS_REGION: ${{ vars.AWS_REGION }}
-      ALB_CERTIFICATE_ARN: ${{ vars.ALB_CERTIFICATE_ARN }}
-      SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
-      DEPLOY_MODE: gitops
+      DEPLOY_MODE: ${{ inputs.deploy_mode }}
       GH_TOKEN: ${{ github.token }}
       GITHUB_TOKEN: ${{ github.token }}
       RELEASE_RUN_ID: ${{ inputs.release_run_id }}
@@ -105,9 +112,6 @@ jobs:
           for v in AWS_REGION AWS_DEPLOY_ROLE_ARN; do
             [[ -n "${!v}" ]] || missing+=("$v")
           done
-          if [[ -n "$ALB_CERTIFICATE_ARN" && "$SMOKE_BASE_URL" != https://* ]]; then
-            missing+=("SMOKE_BASE_URL (https://<DNS name of the certificate>, required with ALB_CERTIFICATE_ARN)")
-          fi
           if ((${#missing[@]} > 0)); then
             echo "::error::Missing repository variables: ${missing[*]}. Settings > Secrets and variables > Actions > Variables; see docs/RUNBOOK.md."
             exit 1
