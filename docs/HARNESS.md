@@ -58,8 +58,8 @@ check executa o autoteste negativo do parser; no CI também avalia o relatório 
 
 O workflow também inicia SonarQube e PostgreSQL descartáveis, gera tokens de análise por projeto,
 instala scanner com SHA256 conferido e importa LCOV. A fixture `security/fixtures/sonar/uncovered.ts`
-precisa reprovar o gate em `new_coverage`; o scanner e o resultado dessa análise específica são
-checados pelo script `scripts/test-sonar-gate.sh`.
+precisa reprovar um gate descartável em `coverage` (menos de 80%); o scanner e o resultado dessa
+análise específica são checados pelo script `scripts/test-sonar-gate.sh`.
 
 `make dast` executa o check `zap-baseline` fora de `make all`: usa as imagens pré-construídas, sobe e
 remove um Compose temporário, aponta o ZAP Baseline + Ajax Spider somente para loopback e guarda o

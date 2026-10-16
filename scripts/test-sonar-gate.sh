@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # Negative integration test: submit a new, deliberately uncovered fixture and prove the
-# Community Build Quality Gate rejected that exact analysis for its new-code coverage condition.
+# Community Build Quality Gate rejected that exact analysis for its overall coverage condition.
 set -euo pipefail
 
 require_env() {
@@ -53,10 +53,6 @@ set +e
 scan_status=$?
 set -e
 
-if ((scan_status == 0)); then
-  echo 'error: the intentionally uncovered fixture unexpectedly passed the SonarQube Quality Gate' >&2
-  exit 1
-fi
 [[ -s "$metadata" ]] || {
   echo 'error: scanner failed before uploading an analysis; this does not prove a Quality Gate rejection' >&2
   cat "$scan_log" >&2
@@ -86,13 +82,19 @@ done
 [[ "${gate_status:-}" == ERROR ]] || {
   echo "error: expected Quality Gate ERROR for fixture analysis, got '${gate_status:-missing}'" >&2
   cat "$scan_log" >&2
+  jq -c '.projectStatus.conditions' <<<"$status_json" >&2
   exit 1
 }
-jq -e '.projectStatus.conditions | any(.metricKey == "new_coverage" and .status == "ERROR")' \
+jq -e '.projectStatus.conditions | any(.metricKey == "coverage" and .status == "ERROR")' \
   <<<"$status_json" >/dev/null || {
-    echo 'error: fixture gate failed for a reason other than insufficient new-code coverage' >&2
+    echo 'error: fixture gate failed for a reason other than insufficient overall coverage' >&2
     jq -c '.projectStatus.conditions' <<<"$status_json" >&2
     exit 1
   }
 
-echo 'PASS: SonarQube rejected the exact fixture analysis because new-code coverage was below the gate.'
+((scan_status != 0)) || {
+  echo 'error: SonarScanner returned success despite the fixture Quality Gate failure' >&2
+  exit 1
+}
+
+echo 'PASS: SonarQube rejected the exact fixture analysis because overall coverage was below 80%.'

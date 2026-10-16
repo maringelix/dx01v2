@@ -100,6 +100,24 @@ fixture_token="$(create_project "$SONAR_FIXTURE_PROJECT" "$SONAR_FIXTURE_PROJECT
 printf '::add-mask::%s\n' "$main_token"
 printf '::add-mask::%s\n' "$fixture_token"
 
+# The fixture is often analyzed for the first time, when Sonar has no new-code baseline. Give only
+# that disposable project a gate that also requires overall coverage, so its zero-coverage LCOV
+# proves a real gate failure on every run.
+fixture_gate="ci-fixture-$suffix"
+api_post /api/qualitygates/create --data-urlencode "name=$fixture_gate" >/dev/null
+api_post /api/qualitygates/create_condition \
+  --data-urlencode "gateName=$fixture_gate" \
+  --data-urlencode 'metric=coverage' \
+  --data-urlencode 'op=LT' \
+  --data-urlencode 'error=80' >/dev/null
+gate_id="$(sonar_request 'find the disposable fixture quality gate' \
+  -H "Authorization: Bearer $admin_token" \
+  "$host/api/qualitygates/list" | jq -er --arg name "$fixture_gate" \
+  '.qualitygates[] | select(.name == $name) | .id')"
+api_post /api/qualitygates/select \
+  --data-urlencode "gateId=$gate_id" \
+  --data-urlencode "projectKey=$SONAR_FIXTURE_PROJECT" >/dev/null
+
 {
   printf 'SONAR_ADMIN_TOKEN=%s\n' "$admin_token"
   printf 'SONAR_TOKEN=%s\n' "$main_token"

@@ -23,9 +23,9 @@ falham fechados: serviço indisponível, relatório ausente ou gate reprovado im
   de análise limitados a cada projeto. Não há GitHub Secret configurado: os valores são gerados no
   runner, usados pelo scanner e encerram junto com o serviço descartável ao fim do job.
 - Uma fixture fictícia, fora das fontes da aplicação, tem mais de 20 linhas sem cobertura e um LCOV
-  explícito com zero linhas cobertas. O CI envia essa fixture a um segundo projeto e confirma, pelo ID
-  daquela análise, que o gate falhou em `new_coverage`. Se a fixture passar ou o scanner falhar antes
-  do upload, o check falha.
+  explícito com zero linhas cobertas. O CI envia essa fixture a um segundo projeto, associa a ele um
+  gate descartável que inclui `coverage < 80%` e confirma, pelo ID daquela análise, que o gate falhou
+  nessa condição. Se a fixture passar ou o scanner falhar antes do upload, o check falha.
 
 ## Dependências, configuração e aplicação em execução
 
