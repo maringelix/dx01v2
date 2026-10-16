@@ -7,6 +7,16 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Added
 
+- R7 DevSecOps gates: CodeQL `security-extended` with a fail-closed SARIF severity threshold, a real
+  SonarQube Community Build Quality Gate with LCOV and a negative coverage fixture, Trivy dependency
+  scanning, OWASP ZAP Baseline against a disposable local Compose deployment, and a Gitleaks check
+  that fails closed when history is not scanned and proves secret detection with a redacted random
+  fixture. A manual, no-rebuild publication workflow verifies the exact successful CI run, creates
+  SPDX SBOM and SLSA provenance attestations for GHCR image digests with keyless Sigstore signing,
+  and tests rejection of an unsigned image and incorrect signer/issuer. See
+  [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md); CI evidence is required before this capability is
+  marked verified.
+
 - Cloud deploy now publishes the app source revision to `gitops/aws` with example parameters, then
   waits for Argo CD to report that exact revision `Synced` and `Healthy`. Direct push remains
   available through the script when Argo CD is not managing the app; the Actions workflow always

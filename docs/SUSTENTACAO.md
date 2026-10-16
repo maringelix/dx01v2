@@ -128,6 +128,13 @@ mesmo nos quatro). Confira a versão real dentro da imagem (por exemplo
 
 ### 5.8 Actions
 
+### 5.8.1 Scanners do R7
+
+Revise os pins do CodeQL Action, SonarQube Community Build, SonarScanner e ZAP nas revisões de
+Dependabot e na rotina trimestral. Para cada atualização, leia a release note, confirme SHA/digest e
+checksum SHA256 do scanner, rode o CI completo e confira os relatórios SARIF e ZAP. Não altere o limite
+SARIF, o Quality Gate ou a severidade de falha para aceitar um finding sem remediação documentada.
+
 Fora do Dependabot: `gh api repos/<o>/<r>/git/ref/tags/<tag>`; se `object.type == "tag"`, siga
 `gh api repos/<o>/<r>/git/tags/<sha>`; use o SHA do commit com `# vX.Y.Z`.
 

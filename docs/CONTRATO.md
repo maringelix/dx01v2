@@ -32,7 +32,7 @@ repositórios e incremento da versão.
 | Cluster EKS | `tx01v2-lab`, Kubernetes `1.36` (suporte padrão do EKS até 2027-08-02) |
 | Namespace do app | `dx01v2` — criado pela camada de plataforma do tx01v2 com os labels `pod-security.kubernetes.io/enforce=restricted`, `pod-security.kubernetes.io/enforce-version=latest`, `elbv2.k8s.aws/pod-readiness-gate-inject=enabled`. Os overlays `aws*` não criam o namespace; o overlay `local` cria um equivalente para o kind |
 | Grupo Kubernetes do deployer | `dx01v2-deployers`, ligado no namespace `dx01v2` (RoleBinding `dx01v2-deployers`) à Role `dx01v2-deployer` |
-| Repositórios ECR | `dx01v2/api`, `dx01v2/web` — tags IMMUTABLE, scan on push; imagens com a tag do SHA git completo (40 caracteres) do dx01v2 |
+| Repositórios ECR | `dx01v2/api`, `dx01v2/web` — tags IMMUTABLE, scan on push; o workflow promove a imagem aprovada do GHCR sem rebuild e fixa o digest ECR nos manifests |
 | Papel OIDC do deploy | `dx01v2-gha-deploy` (criado pelo bootstrap do tx01v2) |
 | Traces (OpenTelemetry) | `http://opentelemetry-collector.observability.svc:4318` (OTLP/HTTP; `OTEL_EXPORTER_OTLP_ENDPOINT` do componente `aws`). O Collector é instalado pela camada de plataforma do tx01v2 e grava os spans no AWS X-Ray da região do lab; o app não recebe nenhuma permissão da AWS para isso |
 

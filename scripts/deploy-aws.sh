@@ -1,13 +1,16 @@
 #!/usr/bin/env bash
 # Deploys dx01v2 to the EKS lab cluster of tx01v2 (docs/CONTRATO.md).
-# CLOUD-MUTATING and billable: pushes images to ECR and makes the AWS Load Balancer Controller
+# CLOUD-MUTATING and billable: promotes images to ECR and makes the AWS Load Balancer Controller
 # create an internet-facing ALB. Run it only on purpose, after the tx01v2 apply + platform steps;
 # the teardown is the tx01v2 destroy. Not run in the cloud yet (v2).
 # Used by .github/workflows/deploy-aws.yml and from a laptop (docs/RUNBOOK.md):
 #   AWS_REGION=us-east-1 scripts/deploy-aws.sh
 # Environment:
 #   AWS_REGION           required; must match the SSM parameter /tx01v2/lab/region
-#   GIT_SHA              commit to deploy (default: HEAD, and the working tree must be clean)
+#   RELEASE_DIR          verified bundle from publish-images (release manifest and two SBOMs)
+#   RELEASE_RUN_ID       successful publish-images Actions run id for that bundle
+#   GH_TOKEN             token with packages:read, attestations:read, and actions:read
+#   GIT_SHA              optional; if set, must equal the release manifest source commit
 #   DEPLOY_MODE          gitops (default: commit to gitops/aws and wait for Argo CD) or push
 #                        (apply the cloud overlay directly; use only when Argo CD is not managing it)
 #   GITHUB_TOKEN         optional in a laptop session; Actions provides it for the GitOps branch push
@@ -16,8 +19,8 @@
 #   SMOKE_BASE_URL       smoke test URL (default http://<ALB hostname>); required with HTTPS:
 #                        https://<a DNS name of the certificate that points at the ALB>
 #   SMOKE_WAIT_SECONDS   how long the smoke test waits for the ALB and its DNS name (default 900)
-# Steps: SSM contract -> images (linux/amd64 build + push; skipped when the tag exists, ECR tags
-# are immutable) -> kubeconfig -> ConfigMap rds-ca -> configure Argo CD and publish gitops/aws
+# Steps: verify signed release -> SSM contract -> promote verified digests from GHCR to ECR
+# (no build; immutable source-SHA tags) -> kubeconfig -> ConfigMap rds-ca -> configure Argo CD and publish gitops/aws
 # (default) -> sync -> ExternalSecrets -> rollouts -> Ingress hostname -> smoke test through the ALB.
 # DEPLOY_MODE=push applies the overlay directly; the script never runs Terraform or deletes anything.
 set -euo pipefail
@@ -51,7 +54,13 @@ CONTRACT_SECRET_STORE=aws-secrets-manager
 ECR_URL_PATTERN='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/'
 RDS_CA_BASE_URL=https://truststore.pki.rds.amazonaws.com/
 # The tx01v2 node group runs AL2023_x86_64_STANDARD.
-IMAGE_PLATFORM=linux/amd64
+RELEASE_MANIFEST=""
+API_SOURCE_NAME=""
+API_SOURCE_DIGEST=""
+API_IMAGE_ID=""
+WEB_SOURCE_NAME=""
+WEB_SOURCE_DIGEST=""
+WEB_IMAGE_ID=""
 
 declare -A PARAM=()
 WORK_DIR=""
@@ -84,6 +93,9 @@ expect_param() { # NAME VALUE
 }
 
 write_summary() { # RESULT
+  local api_digest="${API_IMAGE##*@}" web_digest="${WEB_IMAGE##*@}"
+  [[ "$api_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || api_digest=not-promoted
+  [[ "$web_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || web_digest=not-promoted
   [[ -n "${GITHUB_STEP_SUMMARY:-}" ]] || return 0
   {
     echo "## dx01v2 deploy: $1"
@@ -92,14 +104,9 @@ write_summary() { # RESULT
     echo "|---|---|"
     echo "| Commit | \`${GIT_SHA:-unknown}\` |"
     echo "| Overlay | \`deploy/k8s/overlays/$OVERLAY\` |"
-    echo "| Images | \`dx01v2/api:${GIT_SHA:-}\`, \`dx01v2/web:${GIT_SHA:-}\` in ECR ($AWS_REGION) |"
-    echo "| Entry point | ${BASE:-not reached} |"
-    if [[ -f "$WORK_DIR/smoke.txt" ]]; then
-      echo
-      echo '```'
-      cat "$WORK_DIR/smoke.txt"
-      echo '```'
-    fi
+    echo "| Images | API `$api_digest`, web `$web_digest` in ECR ($AWS_REGION) |"
+    echo "| Entry point | $([[ -n "$ALB_HOSTNAME" ]] && echo 'ALB ready' || echo 'not reached') |"
+    echo "| Smoke test | $([[ -f "$WORK_DIR/smoke.txt" ]] && echo 'completed' || echo 'not completed') |"
     echo
     echo "The ALB, the EKS cluster and RDS bill by the hour: tear the lab down with the tx01v2 terraform-destroy workflow (it deletes every Ingress, and so the ALB, first)."
   } >>"$GITHUB_STEP_SUMMARY"
@@ -122,7 +129,23 @@ cleanup() {
 }
 
 preflight() {
-  require_cmd aws kubectl docker node git curl base64
+  require_cmd aws kubectl docker node git curl base64 gh jq
+  [[ -n "${RELEASE_DIR:-}" ]] || die "RELEASE_DIR is required; publish and verify a release first"
+  [[ -n "${RELEASE_RUN_ID:-}" ]] || die "RELEASE_RUN_ID is required; select the successful publish-images run"
+  [[ -n "${GH_TOKEN:-}" ]] || die "GH_TOKEN with actions:read, attestations:read and packages:read is required"
+  RELEASE_MANIFEST="$RELEASE_DIR/release-manifest.json"
+  bash "$REPO_ROOT/scripts/verify-release-bundle.sh"
+  API_SOURCE_NAME="$(jq -er '.images.api.name' "$RELEASE_MANIFEST")"
+  API_SOURCE_DIGEST="$(jq -er '.images.api.digest' "$RELEASE_MANIFEST")"
+  API_IMAGE_ID="$(jq -er '.images.api.image_id' "$RELEASE_MANIFEST")"
+  WEB_SOURCE_NAME="$(jq -er '.images.web.name' "$RELEASE_MANIFEST")"
+  WEB_SOURCE_DIGEST="$(jq -er '.images.web.digest' "$RELEASE_MANIFEST")"
+  WEB_IMAGE_ID="$(jq -er '.images.web.image_id' "$RELEASE_MANIFEST")"
+  release_sha="$(jq -er '.source.sha' "$RELEASE_MANIFEST")"
+  if [[ -n "${GIT_SHA:-}" && "$GIT_SHA" != "$release_sha" ]]; then
+    die "GIT_SHA does not match the verified release source commit $release_sha"
+  fi
+  GIT_SHA="$release_sha"
   [[ -n "${AWS_REGION:-}" ]] || die "AWS_REGION is required (the region of the tx01v2 lab)"
   [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]+$ ]] || die "AWS_REGION does not look like a region: $AWS_REGION"
   [[ "$DEPLOY_MODE" == gitops || "$DEPLOY_MODE" == push ]] || die "DEPLOY_MODE must be gitops or push"
@@ -132,12 +155,6 @@ preflight() {
   if ((ARGO_SYNC_TIMEOUT < 5)); then
     die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
   fi
-  if [[ -z "${GIT_SHA:-}" ]]; then
-    [[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] ||
-      die "the working tree has uncommitted changes: images are tagged with the commit SHA and ECR tags are immutable"
-    GIT_SHA="$(git -C "$REPO_ROOT" rev-parse HEAD)"
-  fi
-  [[ "$GIT_SHA" =~ ^[0-9a-f]{40}$ ]] || die "GIT_SHA must be a full 40-character commit SHA"
   if [[ -n "${ALB_CERTIFICATE_ARN:-}" ]]; then
     OVERLAY=aws-https
     [[ "${SMOKE_BASE_URL:-}" == https://* ]] ||
@@ -171,23 +188,38 @@ read_contract() {
   log "contract: ${#SSM_NAMES[@]} parameters read and consistent with the manifests"
 }
 
-push_image() { # COMPONENT IMAGE
-  local component=$1 image=$2 found
+promote_image() { # COMPONENT GHCR_NAME GHCR_DIGEST EXPECTED_IMAGE_ID ECR_URL
+  local component=$1 source_name=$2 source_digest=$3 expected_id=$4 ecr_url=$5
+  local source_ref="$source_name@$source_digest" ecr_tag="$ecr_url:$GIT_SHA" found digest remote_id local_id
+  docker pull "$source_ref" >/dev/null || die "cannot pull verified $component source digest $source_ref"
+  local_id="$(docker image inspect "$source_ref" --format '{{.Id}}')"
+  [[ "$local_id" == "$expected_id" ]] || die "$component GHCR digest does not contain the image ID from the release manifest"
   found="$(aws ecr batch-get-image --repository-name "dx01v2/$component" --image-ids "imageTag=$GIT_SHA" \
     --query 'length(images)' --output text)" || die "cannot query the ECR repository dx01v2/$component"
-  if [[ "$found" == 1 ]]; then
-    log "dx01v2/$component:$GIT_SHA is already in ECR (immutable tags): not rebuilt"
-    return 0
+  if [[ "$found" != 1 ]]; then
+    docker tag "$local_id" "$ecr_tag"
+    docker push "$ecr_tag" >&2
+  else
+    log "dx01v2/$component:$GIT_SHA already exists in ECR; verifying it matches the signed release"
   fi
-  docker build --platform "$IMAGE_PLATFORM" -f "$REPO_ROOT/$component/Dockerfile" --build-arg GIT_SHA="$GIT_SHA" \
-    -t "$image" "$REPO_ROOT"
-  docker push "$image"
+  digest="$(aws ecr describe-images --repository-name "dx01v2/$component" --image-ids "imageTag=$GIT_SHA" \
+    --query 'imageDetails[0].imageDigest' --output text)" ||
+    die "cannot resolve the immutable ECR digest for dx01v2/$component:$GIT_SHA"
+  [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || die "ECR returned an invalid $component image digest: $digest"
+  docker pull "$ecr_url@$digest" >/dev/null || die "cannot pull the promoted $component image from ECR"
+  remote_id="$(docker image inspect "$ecr_url@$digest" --format '{{.Id}}')"
+  [[ "$remote_id" == "$expected_id" ]] || die "promoted $component ECR digest differs from the signed GHCR image"
+  printf '%s@%s' "$ecr_url" "$digest"
 }
 
 publish_images() {
-  aws ecr get-login-password | docker login --username AWS --password-stdin "${API_IMAGE%%/*}" >/dev/null
-  push_image api "$API_IMAGE"
-  push_image web "$WEB_IMAGE"
+  local ecr_host
+  ecr_host="$(param ecr/api-url)"
+  ecr_host="${ecr_host%%/*}"
+  aws ecr get-login-password | docker login --username AWS --password-stdin "$ecr_host" >/dev/null
+  API_IMAGE="$(promote_image api "$API_SOURCE_NAME" "$API_SOURCE_DIGEST" "$API_IMAGE_ID" "$(param ecr/api-url)")"
+  WEB_IMAGE="$(promote_image web "$WEB_SOURCE_NAME" "$WEB_SOURCE_DIGEST" "$WEB_IMAGE_ID" "$(param ecr/web-url)")"
+  log "promoted the signed release to ECR by immutable digest; no image was rebuilt"
 }
 
 connect_cluster() {
@@ -239,6 +271,8 @@ data:
   source-commit: "$GIT_SHA"
   api-image-tag: "$GIT_SHA"
   web-image-tag: "$GIT_SHA"
+  api-image-digest: "${API_IMAGE##*@}"
+  web-image-digest: "${WEB_IMAGE##*@}"
 EOF
   kubectl kustomize "$tree/overlays/$OVERLAY" >"$WORK_DIR/rendered.yaml"
   log "overlays/$OVERLAY rendered: $(grep -c '^kind: ' "$WORK_DIR/rendered.yaml") objects"
@@ -261,6 +295,8 @@ data:
   source-commit: "$GIT_SHA"
   api-image-tag: "$GIT_SHA"
   web-image-tag: "$GIT_SHA"
+  api-image-digest: "${API_IMAGE##*@}"
+  web-image-digest: "${WEB_IMAGE##*@}"
 EOF
   kubectl kustomize "$tree/overlays/$OVERLAY" >"$WORK_DIR/rendered.yaml"
   log "GitOps source overlays/$OVERLAY rendered: $(grep -c '^kind: ' "$WORK_DIR/rendered.yaml") objects"
@@ -276,7 +312,8 @@ configure_gitops_application() {
 }
 
 publish_gitops_revision() {
-  GITOPS_REV="$(bash "$REPO_ROOT/scripts/publish-gitops.sh" aws "$OVERLAY" "$GIT_SHA")"
+  GITOPS_REV="$(bash "$REPO_ROOT/scripts/publish-gitops.sh" aws "$OVERLAY" "$GIT_SHA" \
+    "${API_IMAGE##*@}" "${WEB_IMAGE##*@}")"
   [[ "$GITOPS_REV" =~ ^[0-9a-f]{40}$ ]] || die "GitOps branch push returned no commit SHA"
   kubectl -n argocd annotate application dx01v2 argocd.argoproj.io/refresh=normal --overwrite >/dev/null
   log "published origin/gitops/aws at ${GITOPS_REV:0:7}"
@@ -306,7 +343,7 @@ wait_for_rollout() {
   api_init_image="$(kubectl -n "$NAMESPACE" get deployment api -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="migrate")].image}')"
   web_image="$(kubectl -n "$NAMESPACE" get deployment web -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].image}')"
   [[ "$api_image" == "$API_IMAGE" && "$api_init_image" == "$API_IMAGE" && "$web_image" == "$WEB_IMAGE" ]] ||
-    die "Argo CD did not apply the requested immutable images (api=$api_image migrate=$api_init_image web=$web_image)"
+    die "Argo CD did not apply the requested immutable digests (api=${api_image##*@} migrate=${api_init_image##*@} web=${web_image##*@})"
   kubectl -n "$NAMESPACE" rollout status deployment/api --timeout=600s
   kubectl -n "$NAMESPACE" rollout status deployment/web --timeout=600s
 }
@@ -316,6 +353,9 @@ wait_for_ingress() {
   for i in $(seq 1 120); do
     ALB_HOSTNAME="$(kubectl -n "$NAMESPACE" get ingress dx01v2 -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')"
     if [[ -n "$ALB_HOSTNAME" ]]; then
+      if in_actions; then
+        echo "::add-mask::$ALB_HOSTNAME"
+      fi
       log "ALB hostname after about $((i * 5))s: $ALB_HOSTNAME"
       return 0
     fi
@@ -326,8 +366,19 @@ wait_for_ingress() {
 }
 
 smoke() {
-  local token status=0
+  local token status=0 smoke_host
   BASE="${SMOKE_BASE_URL:-http://$ALB_HOSTNAME}"
+  if in_actions; then
+    echo "::add-mask::$BASE"
+    echo "::add-mask::$ALB_HOSTNAME"
+    smoke_host="${BASE#*://}"
+    smoke_host="${smoke_host%%/*}"
+    echo "::add-mask::$smoke_host"
+    smoke_host="${smoke_host%%:*}"
+    if [[ -n "$smoke_host" ]]; then
+      echo "::add-mask::$smoke_host"
+    fi
+  fi
   token=""
   if [[ "$BASE" == https://* ]]; then
     token="$(kubectl -n "$NAMESPACE" get secret app-secrets -o jsonpath='{.data.ADMIN_TOKEN}' | base64 -d)"
@@ -352,7 +403,7 @@ main() {
   trap cleanup EXIT
   section "contract: SSM parameters $SSM_PREFIX/*"
   read_contract
-  section "images dx01v2/api and dx01v2/web, tag $GIT_SHA"
+  section "signed release $GIT_SHA: promote GHCR digests to ECR"
   publish_images
   section "cluster $(param cluster-name): kubeconfig and RBAC"
   connect_cluster
