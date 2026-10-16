@@ -548,7 +548,7 @@ check_shellcheck() {
   need shellcheck
   mapfile -t files < <(find scripts -type f -name '*.sh' | sort)
   printf 'shellcheck: %s\n' "${files[@]}"
-  shellcheck --external-sources --severity=style "${files[@]}"
+  shellcheck --external-sources --severity=style -P scripts "${files[@]}"
 }
 
 check_kubeconform() {
@@ -678,7 +678,7 @@ check_gitleaks() {
     fi
     printf '%s\n' "$history_output"
     ((history_status == 0)) || return "$history_status"
-    history_count="$(printf '%s\n' "$history_output" | grep -Eo '[0-9]+ commits scanned\.?$' | tail -n 1 | cut -d ' ' -f 1)"
+    history_count="$(printf '%s\n' "$history_output" | tr -d '\033' | sed -E 's/\[[0-9;]*m//g' | grep -Eo '[0-9]+ commits scanned\.?$' | tail -n 1 | cut -d ' ' -f 1)"
     [[ "$history_count" =~ ^[1-9][0-9]*$ ]] || die "gitleaks reported a clean history scan without scanning any commits"
   fi
   # The files that would be committed (tracked + untracked, minus .gitignore): never node_modules,

@@ -24,15 +24,18 @@ cleanup() {
 }
 trap cleanup EXIT
 
-[[ "$PORT" =~ ^[1-9][0-9]{0,4}$ ]] && ((PORT <= 65535)) || die "invalid ZAP_FIXTURE_PORT: $PORT"
+if [[ ! "$PORT" =~ ^[1-9][0-9]{0,4}$ ]] || ((10#$PORT > 65535)); then
+  die "invalid ZAP_FIXTURE_PORT: $PORT"
+fi
 mkdir -p "$REPORT_DIR"
 chmod 0777 "$REPORT_DIR"
+cp security/fixtures/dast/zap.conf "$REPORT_DIR/zap.conf"
 export ZAP_FIXTURE_PORT="$PORT"
 node security/fixtures/dast/server.mjs >"$SERVER_LOG" 2>&1 &
 server_pid=$!
 
 ready=0
-for attempt in $(seq 1 50); do
+for ((attempt = 1; attempt <= 50; attempt += 1)); do
   if curl --connect-timeout 1 --max-time 2 -fsS "http://127.0.0.1:$PORT/healthz" >/dev/null; then
     ready=1
     break
@@ -53,7 +56,7 @@ if docker run --rm --network host --shm-size=512m \
   -c /zap/wrk/zap.conf \
   -m 1 \
   -T 10 \
-  -J /zap/wrk/zap-fixture.json; then
+  -J zap-fixture.json; then
   status=0
 else
   status=$?

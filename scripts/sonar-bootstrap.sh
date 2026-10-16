@@ -19,11 +19,35 @@ command -v curl >/dev/null 2>&1 || { echo 'error: curl is required' >&2; exit 1;
 command -v jq >/dev/null 2>&1 || { echo 'error: jq is required' >&2; exit 1; }
 command -v openssl >/dev/null 2>&1 || { echo 'error: openssl is required' >&2; exit 1; }
 
+sonar_request() { # LABEL CURL_ARGS...
+  local label="$1" response_file http_status curl_status response_body
+  shift
+  response_file="$(mktemp "${TMPDIR:-/tmp}/sonar-api.XXXXXX")"
+  if http_status="$(curl --connect-timeout 5 --max-time 20 --silent --show-error \
+    --output "$response_file" --write-out '%{http_code}' "$@")"; then
+    :
+  else
+    curl_status=$?
+    response_body="$(cat "$response_file")"
+    rm -f "$response_file"
+    printf 'error: Sonar API %s failed (curl exit %s): %s\n' "$label" "$curl_status" "${response_body:-no response body}" >&2
+    return "$curl_status"
+  fi
+  if [[ ! "$http_status" =~ ^2[0-9]{2}$ ]]; then
+    response_body="$(cat "$response_file")"
+    rm -f "$response_file"
+    printf 'error: Sonar API %s returned HTTP %s: %s\n' "$label" "$http_status" "${response_body:-no response body}" >&2
+    return 1
+  fi
+  cat "$response_file"
+  rm -f "$response_file"
+}
+
 host="${SONAR_HOST_URL%/}"
 admin_password="$(openssl rand -hex 32)"
 ready=0
 
-for attempt in $(seq 1 180); do
+for ((attempt = 1; attempt <= 180; attempt += 1)); do
   if body="$(curl --connect-timeout 3 --max-time 5 -fsS "$host/api/system/status" 2>/dev/null)" \
     && [[ "$(jq -r '.status // empty' <<<"$body")" == UP ]]; then
     ready=1
@@ -35,16 +59,16 @@ done
 
 # Community Build initializes with admin/admin. Rotate that credential immediately; the generated
 # replacement is never written to the job environment or logs.
-bootstrap_user=admin
-bootstrap_password=admin
-curl --connect-timeout 5 --max-time 20 -fsS -u "$bootstrap_user:$bootstrap_password" -X POST \
+bootstrap_user='admin'
+bootstrap_password='admin'
+sonar_request 'rotate the default admin password' -u "$bootstrap_user:$bootstrap_password" -X POST \
   --data-urlencode 'login=admin' \
   --data-urlencode 'previousPassword=admin' \
   --data-urlencode "password=$admin_password" \
   "$host/api/users/change_password" >/dev/null
 unset bootstrap_user bootstrap_password
 
-admin_payload="$(curl --connect-timeout 5 --max-time 20 -fsS -u "admin:$admin_password" -X POST \
+admin_payload="$(sonar_request 'generate the temporary admin token' -u "admin:$admin_password" -X POST \
   --data-urlencode 'name=ci-administration-bootstrap' \
   --data-urlencode 'type=USER_TOKEN' \
   "$host/api/user_tokens/generate")"
@@ -56,7 +80,7 @@ printf '::add-mask::%s\n' "$admin_token"
 api_post() {
   local path="$1"
   shift
-  curl --connect-timeout 5 --max-time 20 -fsS -H "Authorization: Bearer $admin_token" \
+  sonar_request "$path" -H "Authorization: Bearer $admin_token" \
     -X POST "$@" "$host$path"
 }
 

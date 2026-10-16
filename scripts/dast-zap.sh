@@ -32,7 +32,9 @@ require_cmd docker git openssl od tr
 docker info >/dev/null 2>&1 || die 'Docker daemon is not reachable'
 docker image inspect "$API_IMAGE" "$WEB_IMAGE" >/dev/null 2>&1 ||
   die "the prebuilt images $API_IMAGE and $WEB_IMAGE are required; run 'make build' first"
-[[ "$WEB_PORT" =~ ^[1-9][0-9]{0,4}$ ]] && ((WEB_PORT <= 65535)) || die "invalid ZAP_TARGET_PORT: $WEB_PORT"
+if [[ ! "$WEB_PORT" =~ ^[1-9][0-9]{0,4}$ ]] || ((10#$WEB_PORT > 65535)); then
+  die "invalid ZAP_TARGET_PORT: $WEB_PORT"
+fi
 mkdir -p "$REPORT_DIR"
 chmod 0777 "$REPORT_DIR"
 umask 077
@@ -61,7 +63,7 @@ docker run --rm --network host --shm-size=512m \
   -j \
   -m 5 \
   -T 10 \
-  -J /zap/wrk/zap.json \
-  -r /zap/wrk/zap.html
+  -J zap.json \
+  -r zap.html
 
 echo 'PASS: OWASP ZAP Baseline found no alert at the configured warning threshold.'

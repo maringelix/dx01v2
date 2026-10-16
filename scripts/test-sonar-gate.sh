@@ -70,7 +70,7 @@ analysis_id="$(sed -n 's/^ceTaskId=//p' "$metadata" | head -n 1)"
 }
 
 # Wait for Compute Engine to finish, then query that specific analysis (never a stale project status).
-for attempt in $(seq 1 60); do
+for ((attempt = 1; attempt <= 60; attempt += 1)); do
   status_json="$(curl --connect-timeout 5 --max-time 20 -fsS \
     -H "Authorization: Bearer $SONAR_ADMIN_TOKEN" \
     --get --data-urlencode "analysisId=$analysis_id" \

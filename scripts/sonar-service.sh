@@ -39,7 +39,7 @@ start() {
     "$SONAR_DB_IMAGE" >/dev/null
 
   health=''
-  for attempt in $(seq 1 60); do
+  for ((attempt = 1; attempt <= 60; attempt += 1)); do
     health="$(docker inspect --format '{{.State.Health.Status}}' "$SONAR_DB_CONTAINER")"
     [[ "$health" == healthy ]] && break
     [[ "$health" != unhealthy ]] || { echo 'error: Sonar PostgreSQL became unhealthy' >&2; exit 1; }
