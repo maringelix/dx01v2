@@ -91,13 +91,14 @@ create_project() {
     --data-urlencode "name=$token_name" \
     --data-urlencode 'type=PROJECT_ANALYSIS_TOKEN' \
     --data-urlencode "projectKey=$key" | jq -er '.token | select(type == "string" and length >= 20)')"
-  printf '::add-mask::%s\n' "$project_token"
   printf '%s' "$project_token"
 }
 
 suffix="${GITHUB_RUN_ID:-local}-${GITHUB_RUN_ATTEMPT:-1}"
 main_token="$(create_project "$SONAR_PROJECT_KEY" "$SONAR_PROJECT_KEY" "ci-$suffix-main")"
 fixture_token="$(create_project "$SONAR_FIXTURE_PROJECT" "$SONAR_FIXTURE_PROJECT" "ci-$suffix-fixture")"
+printf '::add-mask::%s\n' "$main_token"
+printf '::add-mask::%s\n' "$fixture_token"
 
 {
   printf 'SONAR_ADMIN_TOKEN=%s\n' "$admin_token"
