@@ -14,7 +14,7 @@ All notable changes to this project are documented here. The format follows
 
 ### Security
 
-- `deploy/local/tx01v2.ref` pins the local platform to the merged tx01v2 R3 commit, so
+- `deploy/local/tx01v2.ref` pins the local platform to the merged tx01v2 R4 commit, so
   `e2e-platform` and `family-ref` check the integrated infrastructure.
 
 - Contract version 3 with tx01v2, coordinated with [tx01v2#14](https://github.com/maringelix/tx01v2/pull/14):
