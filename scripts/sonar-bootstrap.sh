@@ -43,6 +43,18 @@ sonar_request() { # LABEL CURL_ARGS...
   rm -f "$response_file"
 }
 
+extract_token() { # LABEL RESPONSE_JSON
+  local label="$1" payload="$2" token response_summary
+  if token="$(jq -er '.token | select(type == "string" and length >= 20)' <<<"$payload")"; then
+    printf '%s' "$token"
+    return 0
+  fi
+  response_summary="$(jq -c 'if type == "object" then {keys: keys, errors: (.errors // null)} else {type: type} end' \
+    <<<"$payload" 2>/dev/null || echo 'invalid JSON response')"
+  printf 'error: Sonar API %s did not return a token (%s)\n' "$label" "$response_summary" >&2
+  return 1
+}
+
 host="${SONAR_HOST_URL%/}"
 admin_password="Aa1!$(openssl rand -hex 32)"
 ready=0
@@ -56,6 +68,7 @@ for ((attempt = 1; attempt <= 180; attempt += 1)); do
   sleep 5
 done
 ((ready == 1)) || { echo 'error: SonarQube did not become ready within 15 minutes' >&2; exit 1; }
+echo 'SonarQube is ready.'
 
 # Community Build initializes with admin/admin. Rotate that credential immediately; the generated
 # replacement is never written to the job environment or logs.
@@ -67,15 +80,17 @@ sonar_request 'rotate the default admin password' -u "$bootstrap_user:$bootstrap
   --data-urlencode "password=$admin_password" \
   "$host/api/users/change_password" >/dev/null
 unset bootstrap_user bootstrap_password
+echo 'Rotated the disposable SonarQube admin password.'
 
 admin_payload="$(sonar_request 'generate the temporary admin token' -u "admin:$admin_password" -X POST \
   --data-urlencode 'name=ci-administration-bootstrap' \
   --data-urlencode 'type=USER_TOKEN' \
   "$host/api/user_tokens/generate")"
-admin_token="$(jq -er '.token | select(type == "string" and length >= 20)' <<<"$admin_payload")"
+admin_token="$(extract_token 'generate the temporary admin token' "$admin_payload")"
 unset admin_password admin_payload
 
 printf '::add-mask::%s\n' "$admin_token"
+echo 'Generated the disposable administration token.'
 
 api_post() {
   local path="$1"
@@ -85,12 +100,15 @@ api_post() {
 }
 
 create_project() {
-  local key="$1" name="$2" token_name="$3" project_token
+  local key="$1" name="$2" token_name="$3" token_payload project_token
   api_post /api/projects/create --data-urlencode "project=$key" --data-urlencode "name=$name" >/dev/null
-  project_token="$(api_post /api/user_tokens/generate \
+  token_payload="$(api_post /api/user_tokens/generate \
     --data-urlencode "name=$token_name" \
     --data-urlencode 'type=PROJECT_ANALYSIS_TOKEN' \
-    --data-urlencode "projectKey=$key" | jq -er '.token | select(type == "string" and length >= 20)')"
+    --data-urlencode "projectKey=$key")"
+  project_token="$(extract_token "generate project analysis token for $key" "$token_payload")"
+  unset token_payload
+  printf 'Created disposable SonarQube project and analysis token for %s.\n' "$key" >&2
   printf '%s' "$project_token"
 }
 
@@ -99,6 +117,7 @@ main_token="$(create_project "$SONAR_PROJECT_KEY" "$SONAR_PROJECT_KEY" "ci-$suff
 fixture_token="$(create_project "$SONAR_FIXTURE_PROJECT" "$SONAR_FIXTURE_PROJECT" "ci-$suffix-fixture")"
 printf '::add-mask::%s\n' "$main_token"
 printf '::add-mask::%s\n' "$fixture_token"
+echo 'Created both disposable SonarQube projects.'
 
 # The fixture is often analyzed for the first time, when Sonar has no new-code baseline. Give only
 # that disposable project a gate that also requires overall coverage, so its zero-coverage LCOV
@@ -110,10 +129,16 @@ api_post /api/qualitygates/create_condition \
   --data-urlencode 'metric=coverage' \
   --data-urlencode 'op=LT' \
   --data-urlencode 'error=80' >/dev/null
-gate_id="$(sonar_request 'find the disposable fixture quality gate' \
-  -H "Authorization: Bearer $admin_token" \
-  "$host/api/qualitygates/list" | jq -er --arg name "$fixture_gate" \
-  '.qualitygates[] | select(.name == $name) | .id')"
+gate_list="$(sonar_request 'list quality gates' -H "Authorization: Bearer $admin_token" \
+  "$host/api/qualitygates/list")"
+if ! gate_id="$(jq -er --arg name "$fixture_gate" \
+  '.qualitygates[]? | select(.name == $name) | .id | select((type == "string" and length > 0) or type == "number") | tostring' \
+  <<<"$gate_list")"; then
+  available_gates="$(jq -c '[.qualitygates[]? | {name, id}]' <<<"$gate_list" 2>/dev/null || echo 'unrecognized response')"
+  printf 'error: created fixture quality gate %s has no ID in the API list; available gates: %s\n' \
+    "$fixture_gate" "$available_gates" >&2
+  exit 1
+fi
 api_post /api/qualitygates/select \
   --data-urlencode "gateId=$gate_id" \
   --data-urlencode "projectKey=$SONAR_FIXTURE_PROJECT" >/dev/null
