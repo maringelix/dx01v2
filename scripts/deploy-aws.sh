@@ -104,7 +104,7 @@ write_summary() { # RESULT
     echo "|---|---|"
     echo "| Commit | \`${GIT_SHA:-unknown}\` |"
     echo "| Overlay | \`deploy/k8s/overlays/$OVERLAY\` |"
-    printf '| Images | API `%s`, web `%s` in ECR (%s) |\n' "$api_digest" "$web_digest" "$AWS_REGION"
+    printf "| Images | API \`%s\`, web \`%s\` in ECR (%s) |\n" "$api_digest" "$web_digest" "$AWS_REGION"
     echo "| Entry point | $([[ -n "$ALB_HOSTNAME" ]] && echo 'ALB ready' || echo 'not reached') |"
     echo "| Smoke test | $([[ -f "$WORK_DIR/smoke.txt" ]] && echo 'completed' || echo 'not completed') |"
     echo

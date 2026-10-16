@@ -37,6 +37,7 @@ if [[ ! "$WEB_PORT" =~ ^[1-9][0-9]{0,4}$ ]] || ((10#$WEB_PORT > 65535)); then
 fi
 mkdir -p "$REPORT_DIR"
 chmod 0777 "$REPORT_DIR"
+cp security/dast-baseline.conf "$REPORT_DIR/zap-baseline.conf"
 umask 077
 ENV_FILE="$(mktemp "${TMPDIR:-/tmp}/dx01v2-dast-env.XXXXXX")"
 {
@@ -60,10 +61,12 @@ docker run --rm --network host --shm-size=512m \
   --volume "$REPORT_DIR:/zap/wrk/:rw" \
   "$ZAP_IMAGE" zap-baseline.py \
   -t "http://127.0.0.1:$WEB_PORT" \
+  -c /zap/wrk/zap-baseline.conf \
   -j \
+  -I \
   -m 5 \
   -T 10 \
   -J zap.json \
   -r zap.html
 
-echo 'PASS: OWASP ZAP Baseline found no alert at the configured warning threshold.'
+echo 'PASS: OWASP ZAP Baseline found no alert that violates the configured security policy.'

@@ -17,6 +17,10 @@ All notable changes to this project are documented here. The format follows
   [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md); CI evidence is required before this capability is
   marked verified.
 
+- The application DAST policy now fails on selected missing security headers, while retaining all
+  other ZAP warnings in its reports. The web entry point sends COEP and CORP headers and the smoke
+  test asserts their values.
+
 - Cloud deploy now publishes the app source revision to `gitops/aws` with example parameters, then
   waits for Argo CD to report that exact revision `Synced` and `Healthy`. Direct push remains
   available through the script when Argo CD is not managing the app; the Actions workflow always

@@ -44,7 +44,7 @@ sonar_request() { # LABEL CURL_ARGS...
 }
 
 host="${SONAR_HOST_URL%/}"
-admin_password="$(openssl rand -hex 32)"
+admin_password="Aa1!$(openssl rand -hex 32)"
 ready=0
 
 for ((attempt = 1; attempt <= 180; attempt += 1)); do

@@ -103,6 +103,7 @@ jobs:
           subject-name: ${{ steps.publish.outputs.api_name }}
           subject-digest: ${{ steps.publish.outputs.api_digest }}
           push-to-registry: true
+          create-storage-record: false
 
       - name: Attest web image build provenance with Sigstore
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -110,6 +111,7 @@ jobs:
           subject-name: ${{ steps.publish.outputs.web_name }}
           subject-digest: ${{ steps.publish.outputs.web_digest }}
           push-to-registry: true
+          create-storage-record: false
 
       - name: Attest API SPDX SBOM with Sigstore
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -118,6 +120,7 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.api_digest }}
           sbom-path: ${{ runner.temp }}/dx01v2-sbom/api.spdx.json
           push-to-registry: true
+          create-storage-record: false
 
       - name: Attest web SPDX SBOM with Sigstore
         uses: actions/attest@1e69f48acb82d1966a394da916b4c1698aa569d6 # v4.2.2
@@ -126,6 +129,7 @@ jobs:
           subject-digest: ${{ steps.publish.outputs.web_digest }}
           sbom-path: ${{ runner.temp }}/dx01v2-sbom/web.spdx.json
           push-to-registry: true
+          create-storage-record: false
 
       - name: Verify signatures, workflow identity, issuer, commit, and SBOM predicates
         env:

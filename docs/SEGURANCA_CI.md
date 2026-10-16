@@ -37,9 +37,11 @@ falham fechados: serviço indisponível, relatório ausente ou gate reprovado im
 - `make dast` usa as imagens já construídas (`make build` localmente; o artefato da etapa `images` no CI),
   sobe o app e o PostgreSQL num projeto Compose descartável e executa o OWASP ZAP Baseline
   com Ajax Spider em `127.0.0.1` e remove containers, rede e volume ao terminar. O processo ZAP roda
-  sem capabilities adicionais, sem token administrativo e sem acesso a uma nuvem. Qualquer alerta
-  no limite de aviso padrão reprova o check. HTML e JSON ficam fora do repositório; no CI os relatórios
-  são artefatos por sete dias. Depois o mesmo check roda ZAP contra uma fixture local sem CSP, marca
+  sem capabilities adicionais, sem token administrativo e sem acesso a uma nuvem. A política
+  `security/dast-baseline.conf` promove ausência de cabeçalhos e proteções selecionados a `FAIL`;
+  `-I` evita reprovar por avisos de baseline fora dessa política, que continuam visíveis nos relatórios.
+  COEP e CORP também são enviados pela aplicação e verificados no smoke test. HTML e JSON ficam fora
+  do repositório; no CI os relatórios são artefatos por sete dias. Depois o mesmo check roda ZAP contra uma fixture local sem CSP, marca
   a regra 10038 como `FAIL` e exige que o scanner retorne falha com esse finding no JSON.
 - O Baseline faz spider e análise passiva; não é um pentest nem uma prova de ausência de falhas. Ele
   não envia credenciais e não substitui revisão dos findings ou os testes de API e de segurança do

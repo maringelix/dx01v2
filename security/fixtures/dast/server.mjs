@@ -16,6 +16,8 @@ const server = createServer((request, response) => {
     'Cache-Control': 'no-store',
     'Content-Type': 'text/html; charset=utf-8',
     'X-Content-Type-Options': 'nosniff',
+    'Cross-Origin-Embedder-Policy': 'require-corp',
+    'Cross-Origin-Resource-Policy': 'same-origin',
   });
   response.end(
     '<!doctype html><html><head><title>ZAP negative fixture</title></head>' +

@@ -61,6 +61,7 @@ REQUIRED_FILES=(
   scripts/verify-ci-image-artifact.sh scripts/publish-ghcr-images.sh
   scripts/get-publish-run-metadata.sh scripts/verify-release-bundle.sh
   scripts/test-zap-gate.sh
+  security/dast-baseline.conf
   docs/SEGURANCA_CI.md
   security/fixtures/sonar/uncovered.ts
   security/fixtures/sonar/fixture.lcov
@@ -413,9 +414,9 @@ check_policy_workflows() {
     rc=1
   }
   if grep -qF 'docker build' scripts/deploy-aws.sh ||
-    ! grep -qF 'bash "$REPO_ROOT/scripts/verify-release-bundle.sh"' scripts/deploy-aws.sh ||
-    ! grep -qF 'docker pull "$source_ref"' scripts/deploy-aws.sh ||
-    ! grep -qF 'docker pull "$ecr_url@$digest"' scripts/deploy-aws.sh; then
+    ! grep -qF "bash \"\$REPO_ROOT/scripts/verify-release-bundle.sh\"" scripts/deploy-aws.sh ||
+    ! grep -qF "docker pull \"\$source_ref\"" scripts/deploy-aws.sh ||
+    ! grep -qF "docker pull \"\$ecr_url@\$digest\"" scripts/deploy-aws.sh; then
     echo "deploy-aws must verify a signed release and promote it by digest without rebuilding"
     rc=1
   fi
@@ -473,6 +474,14 @@ check_policy_app() {
   }
   grep -qE '^[[:space:]]*server_tokens off;' web/nginx/default.conf || {
     echo "web/nginx/default.conf: server_tokens off is required"
+    rc=1
+  }
+  grep -qE '^add_header Cross-Origin-Embedder-Policy "require-corp" always;$' web/nginx/security-headers.conf || {
+    echo 'web/nginx/security-headers.conf: Cross-Origin-Embedder-Policy require-corp is required'
+    rc=1
+  }
+  grep -qE '^add_header Cross-Origin-Resource-Policy "same-origin" always;$' web/nginx/security-headers.conf || {
+    echo 'web/nginx/security-headers.conf: Cross-Origin-Resource-Policy same-origin is required'
     rc=1
   }
   return "$rc"
@@ -638,8 +647,8 @@ NODE
   expected_push="git -C \"\$tmp/repo\" push --quiet origin \"HEAD:refs/heads/\$branch\""
   if ! grep -qF "$expected_push" scripts/publish-gitops.sh ||
     grep -q -- '--force' scripts/publish-gitops.sh ||
-    ! grep -qF 'api-image-digest: "$api_digest"' scripts/publish-gitops.sh ||
-    ! grep -qF 'web-image-digest: "$web_digest"' scripts/publish-gitops.sh; then
+    ! grep -qF "api-image-digest: \"\$api_digest\"" scripts/publish-gitops.sh ||
+    ! grep -qF "web-image-digest: \"\$web_digest\"" scripts/publish-gitops.sh; then
     echo "publish-gitops.sh must record immutable image digests and push without force"
     rc=1
   fi
