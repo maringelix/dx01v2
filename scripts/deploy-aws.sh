@@ -8,13 +8,18 @@
 # Environment:
 #   AWS_REGION           required; must match the SSM parameter /tx01v2/lab/region
 #   GIT_SHA              commit to deploy (default: HEAD, and the working tree must be clean)
+#   DEPLOY_MODE          gitops (default: commit to gitops/aws and wait for Argo CD) or push
+#                        (apply the cloud overlay directly; use only when Argo CD is not managing it)
+#   GITHUB_TOKEN         optional in a laptop session; Actions provides it for the GitOps branch push
+#   ARGO_SYNC_TIMEOUT    seconds to wait for the GitOps Application (default 600)
 #   ALB_CERTIFICATE_ARN  optional ACM certificate of the region: selects overlays/aws-https
 #   SMOKE_BASE_URL       smoke test URL (default http://<ALB hostname>); required with HTTPS:
 #                        https://<a DNS name of the certificate that points at the ALB>
 #   SMOKE_WAIT_SECONDS   how long the smoke test waits for the ALB and its DNS name (default 900)
 # Steps: SSM contract -> images (linux/amd64 build + push; skipped when the tag exists, ECR tags
-# are immutable) -> kubeconfig -> ConfigMap rds-ca -> render + kubectl apply -k -> ExternalSecrets
-# -> rollouts -> Ingress hostname -> smoke test through the ALB -> job summary (GitHub Actions).
+# are immutable) -> kubeconfig -> ConfigMap rds-ca -> configure Argo CD and publish gitops/aws
+# (default) -> sync -> ExternalSecrets -> rollouts -> Ingress hostname -> smoke test through the ALB.
+# DEPLOY_MODE=push applies the overlay directly; the script never runs Terraform or deletes anything.
 set -euo pipefail
 
 # shellcheck source=scripts/lib/common.sh
@@ -56,6 +61,9 @@ API_IMAGE=""
 WEB_IMAGE=""
 ALB_HOSTNAME=""
 BASE=""
+DEPLOY_MODE="${DEPLOY_MODE:-gitops}"
+ARGO_SYNC_TIMEOUT="${ARGO_SYNC_TIMEOUT:-600}"
+GITOPS_REV=""
 
 in_actions() { [[ "${GITHUB_ACTIONS:-}" == true ]]; }
 
@@ -117,6 +125,13 @@ preflight() {
   require_cmd aws kubectl docker node git curl base64
   [[ -n "${AWS_REGION:-}" ]] || die "AWS_REGION is required (the region of the tx01v2 lab)"
   [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]+$ ]] || die "AWS_REGION does not look like a region: $AWS_REGION"
+  [[ "$DEPLOY_MODE" == gitops || "$DEPLOY_MODE" == push ]] || die "DEPLOY_MODE must be gitops or push"
+  if [[ ! "$ARGO_SYNC_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
+    die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
+  fi
+  if ((ARGO_SYNC_TIMEOUT < 5)); then
+    die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
+  fi
   if [[ -z "${GIT_SHA:-}" ]]; then
     [[ -z "$(git -C "$REPO_ROOT" status --porcelain)" ]] ||
       die "the working tree has uncommitted changes: images are tagged with the commit SHA and ECR tags are immutable"
@@ -181,6 +196,12 @@ connect_cluster() {
     --alias dx01v2-lab >/dev/null
   [[ "$(kubectl auth can-i create deployments.apps -n "$NAMESPACE")" == yes ]] ||
     die "this principal cannot deploy to namespace $NAMESPACE: it needs an EKS access entry in the group dx01v2-deployers (tx01v2 app_deployer_principal_arns) and the tx01v2 platform layer (Role dx01v2-deployer)"
+  if [[ "$DEPLOY_MODE" == gitops ]]; then
+    [[ "$(kubectl auth can-i patch applications.argoproj.io/dx01v2 -n argocd)" == yes ]] ||
+      die "this principal cannot patch the Argo CD Application dx01v2 in argocd (tx01v2 full platform Role)"
+    kubectl -n argocd get application dx01v2 >/dev/null ||
+      die "Argo CD Application dx01v2 is missing (install the tx01v2 full platform first)"
+  fi
 }
 
 create_rds_ca() {
@@ -190,8 +211,8 @@ create_rds_ca() {
   kubectl -n "$NAMESPACE" create configmap rds-ca --from-file=ca.pem="$file" --dry-run=client -o yaml | kubectl apply -f -
 }
 
-render_and_apply() {
-  local params="$WORK_DIR/params.env" tree="$WORK_DIR/k8s"
+write_params() {
+  local params="$WORK_DIR/params.env"
   {
     echo "API_IMAGE=$API_IMAGE"
     echo "WEB_IMAGE=$WEB_IMAGE"
@@ -199,15 +220,93 @@ render_and_apply() {
     echo "VPC_CIDR=$(param vpc-cidr)"
     echo "ALB_CERTIFICATE_ARN=${ALB_CERTIFICATE_ARN:-}"
   } >"$params"
+}
+
+render_and_apply() {
+  local params="$WORK_DIR/params.env" tree="$WORK_DIR/k8s"
+  write_params
   # Validates every value against the contract formats and renders a temporary copy of deploy/k8s.
   k8s_prepare_tree "$tree" "$params"
+  cat >"$tree/overlays/$OVERLAY/gitops-revision.yaml" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitops-revision
+  labels:
+    app.kubernetes.io/name: dx01v2
+    app.kubernetes.io/part-of: dx01v2
+data:
+  source-commit: "$GIT_SHA"
+  api-image-tag: "$GIT_SHA"
+  web-image-tag: "$GIT_SHA"
+EOF
   kubectl kustomize "$tree/overlays/$OVERLAY" >"$WORK_DIR/rendered.yaml"
   log "overlays/$OVERLAY rendered: $(grep -c '^kind: ' "$WORK_DIR/rendered.yaml") objects"
   kubectl apply -k "$tree/overlays/$OVERLAY"
 }
 
+render_gitops_source() {
+  local tree="$WORK_DIR/k8s"
+  write_params
+  k8s_prepare_tree "$tree" "$WORK_DIR/params.env"
+  cat >"$tree/overlays/$OVERLAY/gitops-revision.yaml" <<EOF
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: gitops-revision
+  labels:
+    app.kubernetes.io/name: dx01v2
+    app.kubernetes.io/part-of: dx01v2
+data:
+  source-commit: "$GIT_SHA"
+  api-image-tag: "$GIT_SHA"
+  web-image-tag: "$GIT_SHA"
+EOF
+  kubectl kustomize "$tree/overlays/$OVERLAY" >"$WORK_DIR/rendered.yaml"
+  log "GitOps source overlays/$OVERLAY rendered: $(grep -c '^kind: ' "$WORK_DIR/rendered.yaml") objects"
+}
+
+configure_gitops_application() {
+  local patch="$WORK_DIR/argocd-application-patch.json"
+  write_params
+  node "$REPO_ROOT/scripts/render-gitops-application.mjs" aws "$OVERLAY" \
+    "$WORK_DIR/params.env" "$REPO_ROOT/deploy/k8s/components/aws/params.example.env" >"$patch"
+  kubectl -n argocd patch application dx01v2 --type merge --patch-file "$patch" >/dev/null
+  log "Argo CD Application source configured for $OVERLAY and image tag $GIT_SHA"
+}
+
+publish_gitops_revision() {
+  GITOPS_REV="$(bash "$REPO_ROOT/scripts/publish-gitops.sh" aws "$OVERLAY" "$GIT_SHA")"
+  [[ "$GITOPS_REV" =~ ^[0-9a-f]{40}$ ]] || die "GitOps branch push returned no commit SHA"
+  kubectl -n argocd annotate application dx01v2 argocd.argoproj.io/refresh=normal --overwrite >/dev/null
+  log "published origin/gitops/aws at ${GITOPS_REV:0:7}"
+}
+
+wait_for_gitops() {
+  local i sync health revision=""
+  for i in $(seq 1 $((ARGO_SYNC_TIMEOUT / 5))); do
+    sync="$(kubectl -n argocd get application dx01v2 -o jsonpath='{.status.sync.status}' 2>/dev/null)" || sync=""
+    health="$(kubectl -n argocd get application dx01v2 -o jsonpath='{.status.health.status}' 2>/dev/null)" || health=""
+    revision="$(kubectl -n argocd get application dx01v2 -o jsonpath='{.status.sync.revision}' 2>/dev/null)" || revision=""
+    [[ "$sync" == Synced && "$health" == Healthy && "$revision" == "$GITOPS_REV" ]] && {
+      log "Argo CD: dx01v2 Synced and Healthy at ${revision:0:7}"
+      return 0
+    }
+    ((i % 12 == 0)) && log "Argo CD: dx01v2 sync=${sync:-?} health=${health:-?} revision=${revision:0:7}"
+    sleep 5
+  done
+  kubectl -n argocd get application dx01v2 -o jsonpath='{range .status.conditions[*]}{.type}: {.message}{"\n"}{end}' >&2 || :
+  die "Argo CD did not reach Synced/Healthy at ${GITOPS_REV:0:7} within ${ARGO_SYNC_TIMEOUT}s"
+}
+
 wait_for_rollout() {
+  local api_image api_init_image web_image
   kubectl -n "$NAMESPACE" wait externalsecret/db-credentials externalsecret/app-secrets --for=condition=Ready --timeout=300s
+  api_image="$(kubectl -n "$NAMESPACE" get deployment api -o jsonpath='{.spec.template.spec.containers[?(@.name=="api")].image}')"
+  api_init_image="$(kubectl -n "$NAMESPACE" get deployment api -o jsonpath='{.spec.template.spec.initContainers[?(@.name=="migrate")].image}')"
+  web_image="$(kubectl -n "$NAMESPACE" get deployment web -o jsonpath='{.spec.template.spec.containers[?(@.name=="web")].image}')"
+  [[ "$api_image" == "$API_IMAGE" && "$api_init_image" == "$API_IMAGE" && "$web_image" == "$WEB_IMAGE" ]] ||
+    die "Argo CD did not apply the requested immutable images (api=$api_image migrate=$api_init_image web=$web_image)"
   kubectl -n "$NAMESPACE" rollout status deployment/api --timeout=600s
   kubectl -n "$NAMESPACE" rollout status deployment/web --timeout=600s
 }
@@ -259,8 +358,16 @@ main() {
   connect_cluster
   section "ConfigMap rds-ca ($AWS_REGION bundle)"
   create_rds_ca
-  section "kubectl apply -k deploy/k8s/overlays/$OVERLAY"
-  render_and_apply
+  if [[ "$DEPLOY_MODE" == gitops ]]; then
+    section "configure and publish GitOps revision gitops/aws"
+    render_gitops_source
+    configure_gitops_application
+    publish_gitops_revision
+    wait_for_gitops
+  else
+    section "kubectl apply -k deploy/k8s/overlays/$OVERLAY (direct push alternative)"
+    render_and_apply
+  fi
   section "ExternalSecrets and rollouts"
   wait_for_rollout
   section "Ingress (ALB)"

@@ -47,6 +47,13 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 - `autoscaling`: horizontalpodautoscalers → CRUD completo; `policy`: poddisruptionbudgets → CRUD completo
 - `external-secrets.io`: externalsecrets → CRUD completo
 
+Com o perfil `full` do `tx01v2`, o Argo CD é o dono dos manifests do app. O deploy configura o caminho,
+as imagens e os valores reais em `spec.source.kustomize` da Application `dx01v2` no namespace `argocd`;
+em seguida, publica o commit do app e `params.env` copiado do exemplo na branch `gitops/aws` e pede
+refresh ao Argo CD. O app pai ignora somente `spec.source.path` e `spec.source.kustomize` dessa
+Application e usa `RespectIgnoreDifferences=true`. Para um cluster sem Argo CD, selecione `push` e o
+script aplica diretamente o overlay. A branch pública não recebe IDs reais da conta ou do projeto.
+
 ## Confiança OIDC do GitHub
 
 | Papel | `sub` permitido (StringEquals, audience `sts.amazonaws.com`) |

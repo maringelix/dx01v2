@@ -104,32 +104,26 @@ Settings > Secrets and variables > Actions > **Variables** (aparecem nos logs: n
 
 ## 7. Deploy
 
-Actions > `deploy-aws` > Run workflow (branch `main`) e aprove o environment `lab`. O job roda
-`scripts/deploy-aws.sh`, que:
+No Actions, abra `deploy-aws`, escolha a branch `main`, selecione `mode=gitops` (padrão) e aprove o
+environment `lab`. O modo GitOps exige o perfil `full` do tx01v2, a Application `dx01v2` no Argo CD
+e permissão para publicar `gitops/aws`. Use `mode=push` somente se o Argo CD não estiver gerenciando
+o app.
 
-1. lê os 10 parâmetros `/tx01v2/lab/*` e confere os valores fixos do contrato (cluster, segredos,
-   ClusterSecretStore, URLs do ECR) antes de mudar qualquer coisa;
-2. constrói as imagens `linux/amd64` e publica `dx01v2/api:<sha>` e `dx01v2/web:<sha>` (tags
-   imutáveis: se a tag já existe, não reconstrói);
-3. gera um kubeconfig temporário, confere `kubectl auth can-i create deployments` no namespace
-   `dx01v2` e cria o ConfigMap `rds-ca` com o bundle oficial da região;
-4. renderiza o overlay `aws` (ou `aws-https`) com os valores do SSM e aplica com `kubectl apply -k`;
-5. espera os ExternalSecrets `db-credentials` e `app-secrets`, os rollouts e o hostname do ALB;
-6. roda `e2e/smoke.mjs` pelo ALB (até 15 minutos de espera pelo DNS e pelos targets;
-   `SMOKE_BEHIND_WAF=1`, porque o WAF bloqueia corpos acima de 8 KB com 403) e escreve o resumo do job.
-   Sem `ALB_CERTIFICATE_ARN` o ALB só fala HTTP: o token de admin não é lido nem enviado, e o smoke
-   test pula a chamada `DELETE` com o token (`SKIP` no resumo; a mensagem do teste fica até o
-   destroy). Com HTTPS, o smoke test faz o `DELETE` com o token.
+O job roda `scripts/deploy-aws.sh`, que:
 
-A partir de um laptop (credenciais de um principal em `app_deployer_principal_arns`, working tree
-limpo, porque a tag é o SHA do commit):
+1. lê os 10 parâmetros do SSM e confere região, cluster, nomes dos segredos, ClusterSecretStore e repositórios ECR;
+2. constrói `linux/amd64` e publica `dx01v2/api:<sha>` e `dx01v2/web:<sha>`; tags existentes são reutilizadas e nunca sobrescritas;
+3. obtém kubeconfig temporário, confere o acesso ao namespace e, no modo GitOps, o direito de atualizar a Application `dx01v2`; cria o ConfigMap `rds-ca`;
+4. renderiza e valida o overlay `aws` ou `aws-https`. Em `mode=gitops`, configura os valores reais na Application, publica o commit do app com `params.env` de exemplo na branch `gitops/aws` e pede refresh ao Argo CD. Em `mode=push`, aplica o overlay com `kubectl apply -k`;
+5. no modo GitOps, espera a Application estar `Synced` e `Healthy` no commit publicado; depois espera ExternalSecrets e rollouts e confere as imagens SHA nos Deployments;
+6. espera o hostname do ALB e roda `e2e/smoke.mjs`. Sem certificado, o ALB só fala HTTP e o token de admin não é lido nem enviado; com HTTPS, o smoke test faz o `DELETE` autorizado.
 
-```bash
-make tools                                   # kubectl fixado
-AWS_REGION=us-east-1 scripts/deploy-aws.sh
-```
+De um laptop, configure as credenciais AWS e a autenticação Git para publicar a branch GitOps:
 
-Em Apple Silicon o build `linux/amd64` roda emulado (mais lento): os nós do tx01v2 são x86_64.
+    make tools
+    AWS_REGION=us-east-1 scripts/deploy-aws.sh
+
+Sem Argo CD, use `DEPLOY_MODE=push AWS_REGION=us-east-1 scripts/deploy-aws.sh`.
 
 ## 8. Conferir
 

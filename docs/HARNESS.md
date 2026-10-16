@@ -22,7 +22,7 @@ Ele vive em `scripts/harness.sh`; o `Makefile` e o CI só o chamam. O que passa 
 | Build | `npm-build`, `image:*`, `image-policy:*` | `tsc` e `vite build`; as duas imagens; usuário numérico não root, labels OCI, sem npm/npx/corepack nem shell no runtime da API | comportamento em runtime (ver e2e) | local, CI (Docker) |
 | Vulnerabilidades das imagens | `trivy-image:*` | nenhuma HIGH/CRITICAL com correção disponível | CVEs sem correção, zero-days | local, CI (Docker, rede) |
 | Ponta a ponta | `kind-e2e` (`scripts/e2e-kind.sh`) | cluster kind 1.36: rollouts com initContainer de migração, Pod Security `restricted` imposto, smoke test pelo nginx (cabeçalhos, API, 201/400/401/204/404/413/429, XFF falso, request ID) e sondas de NetworkPolicy (permitido/bloqueado) | EKS, ALB, WAF, ESO, RDS, VPC CNI | local, CI (Docker) |
-| Nuvem | workflow `deploy-aws`, `scripts/deploy-aws.sh` | — | — | `não executado em nuvem (v2)` |
+| Nuvem | workflow deploy-aws e `contract-app` | render dos overlays e dos patches da Application validados localmente; sync real continua sem execução | AWS e smoke na nuvem | `não executado em nuvem (v2)` |
 
 O smoke do compose (`scripts/compose-smoke.sh`) usa o mesmo `e2e/smoke.mjs`, mas roda à mão (fora
 do CI): ver `docs/RUNBOOK.md`.

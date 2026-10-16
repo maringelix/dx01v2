@@ -43,7 +43,7 @@ The lab family (v2):
 | Images: build, numeric non-root user, no npm or shell in the API runtime, trivy HIGH/CRITICAL gate | `verified in CI` | `make build`; CI job `images` |
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
-| AWS deploy (ECR push, EKS of tx01v2, ExternalSecrets, ALB + WAF, traces to the OpenTelemetry Collector of tx01v2 and AWS X-Ray, smoke test through the ALB) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| AWS deploy (ECR, EKS of tx01v2, ExternalSecrets, ALB + WAF, traces to the OpenTelemetry Collector and AWS X-Ray, smoke test; Argo CD GitOps by default, direct push as an alternative) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
@@ -72,7 +72,9 @@ flowchart LR
 
 - Local (compose) and kind: one reverse proxy (web nginx) in front of the API (`TRUST_PROXY_HOPS=1`).
 - AWS: the ALB (with the WAF of tx01v2) routes `/api` to the API and `/` to the web; secrets come
-  from Secrets Manager through External Secrets; the namespace, IAM and RDS belong to tx01v2.
+  from Secrets Manager through External Secrets; the namespace, IAM and RDS belong to tx01v2. The
+  deploy workflow publishes the source revision to `gitops/aws` for Argo CD; direct push remains
+  available for clusters without Argo CD.
 - Design decisions, diagrams per environment and the v1 → v2 table: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Quick start (free, local)
@@ -109,8 +111,8 @@ defaults, including the ALB this app creates (reference list prices, see the
 costs more than US$40 per week. Use a dedicated AWS account and destroy on the same day.
 
 Follow [docs/RUNBOOK.md](docs/RUNBOOK.md): tx01v2 bootstrap/apply/platform → GitHub variables of
-dx01v2 → `deploy-aws` workflow (or `scripts/deploy-aws.sh`) → smoke test through the ALB → tx01v2
-destroy + leftover check → `cloud_run_report` issue.
+dx01v2 → `deploy-aws` workflow (GitOps with Argo CD by default, or direct push) → smoke test through
+the ALB → tx01v2 destroy + leftover check → `cloud_run_report` issue.
 
 ## Harness
 
