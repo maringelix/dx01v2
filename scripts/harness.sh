@@ -389,8 +389,9 @@ check_policy_workflows() {
     }
   done
   if ! grep -qE '^  workflow_dispatch:' .github/workflows/deploy-aws.yml ||
-    grep -qE '^  (push|pull_request|pull_request_target|schedule|workflow_run):' .github/workflows/deploy-aws.yml; then
-    echo "deploy-aws.yml must be workflow_dispatch only (cloud workflow)"
+    grep -qE '^  (push|pull_request|pull_request_target|schedule|workflow_run):' .github/workflows/deploy-aws.yml ||
+    grep -qE '^    inputs:' .github/workflows/deploy-aws.yml; then
+    echo "deploy-aws.yml must be workflow_dispatch only, without inputs (cloud workflow)"
     rc=1
   fi
   grep -qE '^    environment: lab$' .github/workflows/deploy-aws.yml || {
@@ -579,13 +580,15 @@ check_contract_app() {
       rc=1
     fi
   done
-  if ! grep -qF "DEPLOY_MODE: \$"'{{ inputs.mode }}' .github/workflows/deploy-aws.yml ||
+  expected_mode="DEPLOY_MODE=\"\${DEPLOY_MODE:-gitops}\""
+  if ! grep -qF 'DEPLOY_MODE: gitops' .github/workflows/deploy-aws.yml ||
     ! grep -qF 'contents: write' .github/workflows/deploy-aws.yml ||
-    ! grep -qF 'default: gitops' .github/workflows/deploy-aws.yml; then
+    grep -qE '^    inputs:' .github/workflows/deploy-aws.yml ||
+    ! grep -qF "$expected_mode" scripts/deploy-aws.sh; then
     echo "deploy-aws must default to the GitOps branch publishing mode"
     rc=1
   fi
-  expected_push="git push --quiet origin \"HEAD:refs/heads/\$branch\""
+  expected_push="git -C \"\$tmp/repo\" push --quiet origin \"HEAD:refs/heads/\$branch\""
   if ! grep -qF "$expected_push" scripts/publish-gitops.sh ||
     grep -q -- '--force' scripts/publish-gitops.sh; then
     echo "publish-gitops.sh must push the cloud branch without force"

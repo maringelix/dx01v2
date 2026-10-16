@@ -14,7 +14,9 @@ const fail = (message) => {
   process.exitCode = 1;
 };
 const document = JSON.parse(readFileSync(patchFile, 'utf8'));
-const manifests = parseAllDocuments(readFileSync(manifestsFile, 'utf8')).map((doc) => doc.toJS()).filter(Boolean);
+const manifests = parseAllDocuments(readFileSync(manifestsFile, 'utf8'))
+  .map((doc) => doc.toJS())
+  .filter(Boolean);
 const source = document.spec?.source;
 if (typeof source?.path !== 'string' || !/^deploy\/k8s\/overlays\/(aws|aws-https)$/.test(source.path)) {
   fail(`unexpected source path: ${source?.path}`);
@@ -69,9 +71,13 @@ for (const entry of patches) {
       fail(`unsupported patch operation for ${kind}/${name}: ${JSON.stringify(operation)}`);
       continue;
     }
-    const segments = operation.path.slice(1).split('/').map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~'));
+    const segments = operation.path
+      .slice(1)
+      .split('/')
+      .map((part) => part.replaceAll('~1', '/').replaceAll('~0', '~'));
     let current = targets[0];
-    for (const segment of segments.slice(0, -1)) current = current?.[Array.isArray(current) ? Number(segment) : segment];
+    for (const segment of segments.slice(0, -1))
+      current = current?.[Array.isArray(current) ? Number(segment) : segment];
     const last = segments.at(-1);
     if (current === null || typeof current !== 'object' || !(last in current)) {
       fail(`replace path ${operation.path} does not exist on ${kind}/${name}`);

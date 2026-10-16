@@ -43,7 +43,7 @@ A família do lab (v2):
 | Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado no CI` | `make build`; job `images` do CI |
 | Stack do compose (PostgreSQL → migrate → api → web em 127.0.0.1) + smoke test | `verificado localmente` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, fora do CI) |
 | Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado no CI` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
-| Deploy na AWS (ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, traces para o OpenTelemetry Collector e o AWS X-Ray, smoke test; GitOps com Argo CD por padrão, push direto como alternativa) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| Deploy na AWS (ECR, EKS do tx01v2, ExternalSecrets, ALB + WAF, traces para o OpenTelemetry Collector e o AWS X-Ray, smoke test; workflow com GitOps do Argo CD, push direto pelo script como alternativa) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Configurações do repositório como código (ruleset, environment `lab`) | `verificado localmente` | `scripts/repo-guardrails.sh` aplicado; conferido com `gh api` em 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **O app na plataforma local completa do tx01v2** (kind + ECR, RDS, S3, load balancer e servidor git emulados): imagens no registry do lab, GitOps com Argo CD (Synced, Healthy, self-heal) | `verificado no CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS pelo load balancer emulado e um Gateway do Istio (cert-manager, CA do lab), smoke test de fora do mesh; TLS `verify-full` no banco | `verificado no CI` | `make e2e-platform` (sonda `smoke`) |
@@ -73,7 +73,8 @@ flowchart LR
 - Local (compose) e kind: um proxy reverso (o nginx do web) na frente da API (`TRUST_PROXY_HOPS=1`).
 - AWS: o ALB (com o WAF do tx01v2) manda `/api` para a API e `/` para o web; os segredos vêm do
   Secrets Manager pelo External Secrets; namespace, IAM e RDS são do tx01v2. O workflow publica a
-  revisão na branch `gitops/aws` para o Argo CD; push direto fica disponível para clusters sem Argo CD.
+  revisão na branch `gitops/aws` para o Argo CD; o script também aceita push direto para clusters sem
+  Argo CD, enquanto o workflow do Actions usa sempre GitOps.
 - Decisões de design, diagramas por ambiente e a tabela v1 → v2: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Início rápido (grátis, local)
@@ -110,7 +111,7 @@ padrões, incluindo o ALB que este app cria (preços de tabela de referência, v
 lab esquecido custa mais de US$40 por semana. Use uma conta AWS dedicada e destrua no mesmo dia.
 
 Siga o [docs/RUNBOOK.md](docs/RUNBOOK.md): bootstrap/apply/plataforma do tx01v2 → variáveis do
-GitHub do dx01v2 → workflow `deploy-aws` (GitOps com Argo CD por padrão, ou push direto) → smoke test
+GitHub do dx01v2 → workflow `deploy-aws` (GitOps com Argo CD) → smoke test
 pelo ALB → destroy do tx01v2 + checagem de sobras → issue `cloud_run_report`.
 
 ## Harness

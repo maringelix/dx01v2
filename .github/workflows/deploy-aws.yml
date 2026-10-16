@@ -7,15 +7,6 @@ name: deploy-aws
 
 on:
   workflow_dispatch:
-    inputs:
-      mode:
-        description: GitOps commit and Argo CD sync, or direct push for a cluster without the full profile
-        required: true
-        type: choice
-        options:
-          - gitops
-          - push
-        default: gitops
 
 permissions:
   contents: read
@@ -36,7 +27,7 @@ jobs:
       AWS_REGION: ${{ vars.AWS_REGION }}
       ALB_CERTIFICATE_ARN: ${{ vars.ALB_CERTIFICATE_ARN }}
       SMOKE_BASE_URL: ${{ vars.SMOKE_BASE_URL }}
-      DEPLOY_MODE: ${{ inputs.mode }}
+      DEPLOY_MODE: gitops
       GITHUB_TOKEN: ${{ github.token }}
     steps:
       - name: Check repository variables

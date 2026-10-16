@@ -104,17 +104,16 @@ Settings > Secrets and variables > Actions > **Variables** (aparecem nos logs: n
 
 ## 7. Deploy
 
-No Actions, abra `deploy-aws`, escolha a branch `main`, selecione `mode=gitops` (padrão) e aprove o
-environment `lab`. O modo GitOps exige o perfil `full` do tx01v2, a Application `dx01v2` no Argo CD
-e permissão para publicar `gitops/aws`. Use `mode=push` somente se o Argo CD não estiver gerenciando
-o app.
+No Actions, abra `deploy-aws`, escolha a branch `main` e aprove o environment `lab`. O workflow usa
+GitOps e exige o perfil `full` do tx01v2, a Application `dx01v2` no Argo CD e permissão para publicar
+`gitops/aws`. Se o cluster não usa Argo CD, execute o script de um laptop com `DEPLOY_MODE=push`.
 
 O job roda `scripts/deploy-aws.sh`, que:
 
 1. lê os 10 parâmetros do SSM e confere região, cluster, nomes dos segredos, ClusterSecretStore e repositórios ECR;
 2. constrói `linux/amd64` e publica `dx01v2/api:<sha>` e `dx01v2/web:<sha>`; tags existentes são reutilizadas e nunca sobrescritas;
 3. obtém kubeconfig temporário, confere o acesso ao namespace e, no modo GitOps, o direito de atualizar a Application `dx01v2`; cria o ConfigMap `rds-ca`;
-4. renderiza e valida o overlay `aws` ou `aws-https`. Em `mode=gitops`, configura os valores reais na Application, publica o commit do app com `params.env` de exemplo na branch `gitops/aws` e pede refresh ao Argo CD. Em `mode=push`, aplica o overlay com `kubectl apply -k`;
+4. renderiza e valida o overlay `aws` ou `aws-https`. No workflow, configura os valores reais na Application, publica o commit do app com `params.env` de exemplo na branch `gitops/aws` e pede refresh ao Argo CD. No uso local com `DEPLOY_MODE=push`, aplica o overlay com `kubectl apply -k`;
 5. no modo GitOps, espera a Application estar `Synced` e `Healthy` no commit publicado; depois espera ExternalSecrets e rollouts e confere as imagens SHA nos Deployments;
 6. espera o hostname do ALB e roda `e2e/smoke.mjs`. Sem certificado, o ALB só fala HTTP e o token de admin não é lido nem enviado; com HTTPS, o smoke test faz o `DELETE` autorizado.
 

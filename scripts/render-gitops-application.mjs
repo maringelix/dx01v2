@@ -59,7 +59,12 @@ const addPatch = (kind, name, path, value) => {
   });
 };
 
-addPatch('Ingress', 'dx01v2', '/metadata/annotations/alb.ingress.kubernetes.io~1wafv2-acl-arn', required(actual, 'WAF_ACL_ARN'));
+addPatch(
+  'Ingress',
+  'dx01v2',
+  '/metadata/annotations/alb.ingress.kubernetes.io~1wafv2-acl-arn',
+  required(actual, 'WAF_ACL_ARN'),
+);
 for (const [name, cidrPath] of [
   ['web-ingress-from-alb', '/spec/ingress/0/from/0/ipBlock/cidr'],
   ['api-ingress-from-alb', '/spec/ingress/0/from/0/ipBlock/cidr'],
@@ -68,7 +73,12 @@ for (const [name, cidrPath] of [
   addPatch('NetworkPolicy', name, cidrPath, required(actual, 'VPC_CIDR'));
 }
 if (overlay === 'aws-https') {
-  addPatch('Ingress', 'dx01v2', '/metadata/annotations/alb.ingress.kubernetes.io~1certificate-arn', required(actual, 'ALB_CERTIFICATE_ARN'));
+  addPatch(
+    'Ingress',
+    'dx01v2',
+    '/metadata/annotations/alb.ingress.kubernetes.io~1certificate-arn',
+    required(actual, 'ALB_CERTIFICATE_ARN'),
+  );
 }
 
 const document = {
@@ -76,10 +86,7 @@ const document = {
     source: {
       path: `deploy/k8s/overlays/${overlay}`,
       kustomize: {
-        images: [
-          `${apiExample.name}=${api.name}:${api.tag}`,
-          `${webExample.name}=${web.name}:${web.tag}`,
-        ],
+        images: [`${apiExample.name}=${api.name}:${api.tag}`, `${webExample.name}=${web.name}:${web.tag}`],
         patches,
       },
     },
