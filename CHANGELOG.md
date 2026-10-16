@@ -10,6 +10,8 @@ All notable changes to this project are documented here. The format follows
 - Cloud deploy now publishes the app source revision to `gitops/aws` with example parameters, then
   waits for Argo CD to report that exact revision `Synced` and `Healthy`. Direct push remains
   available when Argo CD is not managing the app.
+- Contract version 4 with tx01v2 records the R4 Argo CD Application and refresh permission; cloud
+  values are configured on the live Application while the public branch contains only example parameters.
 
 
 ### Security
