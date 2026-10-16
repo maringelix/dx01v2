@@ -59,24 +59,61 @@ set -e
   exit 1
 }
 
-analysis_id="$(sed -n 's/^ceTaskId=//p' "$metadata" | head -n 1)"
-[[ "$analysis_id" =~ ^[A-Za-z0-9_-]+$ ]] || {
+task_id="$(sed -n 's/^ceTaskId=//p' "$metadata" | head -n 1)"
+[[ "$task_id" =~ ^[A-Za-z0-9_-]+$ ]] || {
   echo 'error: scanner metadata has no valid Compute Engine task id' >&2
   exit 1
 }
 
-# Wait for Compute Engine to finish, then query that specific analysis (never a stale project status).
+# ceTaskId is a Compute Engine task, not an analysisId. Resolve the completed task first so the
+# quality-gate lookup is bound to the exact analysis submitted by this scanner invocation.
+task_json=''
+task_status=''
+analysis_id=''
 for ((attempt = 1; attempt <= 60; attempt += 1)); do
+  task_json="$(curl --connect-timeout 5 --max-time 20 -fsS \
+    -H "Authorization: Bearer $SONAR_ADMIN_TOKEN" \
+    --get --data-urlencode "id=$task_id" \
+    "$host/api/ce/task")" || {
+      sleep 5
+      continue
+    }
+  task_status="$(jq -r '.task.status // empty' <<<"$task_json")"
+  case "$task_status" in
+    SUCCESS)
+      analysis_id="$(jq -r '.task.analysisId // empty' <<<"$task_json")"
+      break
+      ;;
+    FAILED | CANCELED)
+      echo "error: fixture Compute Engine task ended with $task_status" >&2
+      jq -c '.task.errorMessage // .task' <<<"$task_json" >&2
+      cat "$scan_log" >&2
+      exit 1
+      ;;
+  esac
+  sleep 5
+done
+[[ "$analysis_id" =~ ^[A-Za-z0-9_-]+$ ]] || {
+  echo "error: fixture Compute Engine task did not produce an analysis id (status '${task_status:-missing}')" >&2
+  if [[ -n "$task_json" ]]; then jq -c '.task // .' <<<"$task_json" >&2; fi
+  cat "$scan_log" >&2
+  exit 1
+}
+
+# Query that specific analysis (never a stale project status).
+status_json=''
+gate_status=''
+for ((attempt = 1; attempt <= 12; attempt += 1)); do
   status_json="$(curl --connect-timeout 5 --max-time 20 -fsS \
     -H "Authorization: Bearer $SONAR_ADMIN_TOKEN" \
     --get --data-urlencode "analysisId=$analysis_id" \
     "$host/api/qualitygates/project_status")" || {
-      sleep 5
+      sleep 1
       continue
     }
   gate_status="$(jq -r '.projectStatus.status // empty' <<<"$status_json")"
   [[ -n "$gate_status" ]] && break
-  sleep 5
+  sleep 1
 done
 
 [[ "${gate_status:-}" == ERROR ]] || {
