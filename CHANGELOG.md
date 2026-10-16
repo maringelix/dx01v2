@@ -65,6 +65,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `scripts/e2e-platform.sh` runs the branch-image smoke assertions after the zero-downtime rollout
+  promotes that image; the initial platform state intentionally uses the previous `main` image for
+  rollback coverage.
 - `scripts/deploy-local.sh` waits until each Deployment has the expected image tag before checking its
   rollout, so Argo CD sync status cannot make the previous image look like the new release.
 

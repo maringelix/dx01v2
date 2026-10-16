@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 # dx01v2 harness: every check lives here. `make` targets and every CI job only call this script.
-# Usage: scripts/harness.sh <stage>...   stages: static, test, build, e2e, platform, platform-small, all, list
+# Usage: scripts/harness.sh <stage>...   stages: static, test, build, dast, e2e, platform, platform-small, all, list
 #   HARNESS_STRICT=1   (set in CI) turns every SKIP into a FAIL
 #   HARNESS_VERBOSE=1  also prints the output of passing checks
 #   HARNESS_ONLY=<re>  runs only the checks whose name matches (local debugging; never in CI)
