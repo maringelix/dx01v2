@@ -40,9 +40,15 @@ for (const override of images) {
   }
   const sourceName = override.slice(0, separator);
   const targetImage = override.slice(separator + 1);
+  const digestSeparator = targetImage.lastIndexOf('@');
   const tagSeparator = targetImage.lastIndexOf(':');
-  if (tagSeparator <= targetImage.lastIndexOf('/') || !/^[0-9a-f]{40}$/.test(targetImage.slice(tagSeparator + 1))) {
-    fail(`image override must target an image tagged with the full source commit SHA: ${override}`);
+  const digestPinned =
+    digestSeparator > targetImage.lastIndexOf('/') &&
+    /^sha256:[0-9a-f]{64}$/.test(targetImage.slice(digestSeparator + 1));
+  const sourceTagPinned =
+    tagSeparator > targetImage.lastIndexOf('/') && /^[0-9a-f]{40}$/.test(targetImage.slice(tagSeparator + 1));
+  if (!digestPinned && !sourceTagPinned) {
+    fail(`image override must use a sha256 digest or full source commit SHA tag: ${override}`);
     continue;
   }
   if (!workloads.some((container) => container.image?.startsWith(`${sourceName}:`))) {

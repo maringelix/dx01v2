@@ -7,6 +7,20 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Added
 
+- R7 DevSecOps gates: CodeQL `security-extended` with a fail-closed SARIF severity threshold, a real
+  SonarQube Community Build Quality Gate with LCOV and a negative coverage fixture, Trivy dependency
+  scanning, OWASP ZAP Baseline against a disposable local Compose deployment, and a Gitleaks check
+  that fails closed when history is not scanned and proves secret detection with a redacted random
+  fixture. A manual, no-rebuild publication workflow verifies the exact successful CI run, creates
+  SPDX SBOM and SLSA provenance attestations for GHCR image digests with keyless Sigstore signing,
+  and tests rejection of an unsigned image and incorrect signer/issuer. See
+  [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md); CI evidence is required before this capability is
+  marked verified.
+
+- The application DAST policy now fails on selected missing security headers, while retaining all
+  other ZAP warnings in its reports. The web entry point sends COEP and CORP headers and the smoke
+  test asserts their values.
+
 - Cloud deploy now publishes the app source revision to `gitops/aws` with example parameters, then
   waits for Argo CD to report that exact revision `Synced` and `Healthy`. Direct push remains
   available through the script when Argo CD is not managing the app; the Actions workflow always
@@ -51,6 +65,9 @@ All notable changes to this project are documented here. The format follows
 
 ### Fixed
 
+- `scripts/e2e-platform.sh` runs the branch-image smoke assertions after the zero-downtime rollout
+  promotes that image; the initial platform state intentionally uses the previous `main` image for
+  rollback coverage.
 - `scripts/deploy-local.sh` waits until each Deployment has the expected image tag before checking its
   rollout, so Argo CD sync status cannot make the previous image look like the new release.
 

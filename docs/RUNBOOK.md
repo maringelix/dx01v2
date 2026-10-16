@@ -104,27 +104,18 @@ Settings > Secrets and variables > Actions > **Variables** (aparecem nos logs: n
 
 ## 7. Deploy
 
-No Actions, abra `deploy-aws`, escolha a branch `main` e aprove o environment `lab`. O workflow usa
-GitOps e exige o perfil `full` do tx01v2, a Application `dx01v2` no Argo CD e permissão para publicar
-`gitops/aws`. Se o cluster não usa Argo CD, execute o script de um laptop com `DEPLOY_MODE=push`.
+O deploy usa duas execucoes manuais no Actions:
 
-O job roda `scripts/deploy-aws.sh`, que:
+1. Na branch main, abra publish-images e informe ci_run_id de uma execucao CI push verde do mesmo commit. O workflow confirma os cinco jobs obrigatorios, confere o arquivo de imagens e publica no GHCR sem rebuild; anexa proveniencia Sigstore keyless e SBOM SPDX.
+2. Abra deploy-aws na branch main e informe release_run_id da execucao publish-images concluida. Antes da aprovacao do environment lab, o job valida CI, SBOM, digests e identidade exata do workflow/emissor. Depois da aprovacao, assume a role AWS por OIDC.
+3. O script promove os digests verificados do GHCR para ECR sem rebuild, confere que os image IDs continuam iguais, e publica os manifests GitOps apontando para os digests ECR. O modo padrao espera Argo CD, ExternalSecrets, rollouts e smoke test. Se o cluster nao usa Argo CD, execute com DEPLOY_MODE=push.
 
-1. lê os 10 parâmetros do SSM e confere região, cluster, nomes dos segredos, ClusterSecretStore e repositórios ECR;
-2. constrói `linux/amd64` e publica `dx01v2/api:<sha>` e `dx01v2/web:<sha>`; tags existentes são reutilizadas e nunca sobrescritas;
-3. obtém kubeconfig temporário, confere o acesso ao namespace e, no modo GitOps, o direito de atualizar a Application `dx01v2`; cria o ConfigMap `rds-ca`;
-4. renderiza e valida o overlay `aws` ou `aws-https`. No workflow, configura os valores reais na Application, publica o commit do app com `params.env` de exemplo na branch `gitops/aws` e pede refresh ao Argo CD. No uso local com `DEPLOY_MODE=push`, aplica o overlay com `kubectl apply -k`;
-5. no modo GitOps, espera a Application estar `Synced` e `Healthy` no commit publicado; depois espera ExternalSecrets e rollouts e confere as imagens SHA nos Deployments;
-6. espera o hostname do ALB e roda `e2e/smoke.mjs`. Sem certificado, o ALB só fala HTTP e o token de admin não é lido nem enviado; com HTTPS, o smoke test faz o `DELETE` autorizado.
+O fluxo continua sem executar Terraform ou apagar recursos. O EKS, o ALB e o RDS faturam ate o teardown do tx01v2.
 
-De um laptop, configure as credenciais AWS e a autenticação Git para publicar a branch GitOps:
+Para uso local, baixe o bundle da execucao publish-images, instale gh e docker e autentique na AWS, GHCR e GitHub. Defina RELEASE_DIR e RELEASE_RUN_ID para o bundle/run escolhidos, GH_TOKEN com actions:read, attestations:read e packages:read, GITHUB_REPOSITORY e GITHUB_TOKEN com contents:write; execute scripts/verify-release-bundle.sh antes de scripts/deploy-aws.sh. O script repete as verificacoes antes de acessar a AWS.
 
-    make tools
-    AWS_REGION=us-east-1 scripts/deploy-aws.sh
-
-Sem Argo CD, use `DEPLOY_MODE=push AWS_REGION=us-east-1 scripts/deploy-aws.sh`.
-
-## 8. Conferir
+Rollback da aplicacao: publique no GitOps o digest anterior aprovado e aguarde o rollout. Isso nao desfaz migracoes nem recupera linhas apagadas. Para perda de dados, use o procedimento de backup/PITR em docs/MIGRATIONS.md. Nunca edite uma migracao aplicada; corrija com uma nova migracao.
+  ## 8. Conferir
 
 ```bash
 aws eks update-kubeconfig --name tx01v2-lab --region us-east-1 --kubeconfig ~/.kube/tx01v2-lab.kubeconfig
@@ -153,7 +144,7 @@ Para tirar só o ALB do app e manter o cluster: `kubectl -n dx01v2 delete ingres
 | initContainer `migrate` falha com erro de TLS | ConfigMap `rds-ca` ausente ou região errada | o script recria o ConfigMap; confira `DB_SSL_CA_FILE` e o bundle da região |
 | Ingress sem endereço | AWS Load Balancer Controller ou tags de subnet | `kubectl -n dx01v2 describe ingress dx01v2` (eventos do controller) |
 | Smoke test com 403 em tudo | regra do WAF (reputação de IP, limite por IP) | logs do WAF (`aws-waf-logs-tx01v2-lab`) |
-| `tag invalid ... already exists` no push | tag imutável já publicada | a imagem daquele commit já existe: o script só a reutiliza quando a consulta ao ECR funciona |
+| tag imutável já aponta para outra imagem | SHA do commit já existe no ECR | o deploy compara o image ID ECR com o digest GHCR assinado e para se houver diferença; nunca sobrescreve o tag |
 | Nenhum trace no X-Ray | Collector ausente (plataforma antiga do tx01v2, contrato v1) ou sem a permissão do X-Ray | `kubectl -n observability get pods`; logs do Collector (`kubectl -n observability logs deployment/opentelemetry-collector`); a API nunca falha por isso: os spans só se perdem |
 
 ## 11. Registro

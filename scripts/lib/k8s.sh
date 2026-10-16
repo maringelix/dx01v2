@@ -21,8 +21,8 @@ declare -A K8S_LOCAL_PARAM_PATTERN=(
 # Formats accepted for every deploy parameter (values come from SSM, docs/CONTRATO.md).
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_PARAM_PATTERN=(
-  [API_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api:[0-9a-f]{40}$'
-  [WEB_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/web:[0-9a-f]{40}$'
+  [API_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
+  [WEB_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/web(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [WAF_ACL_ARN]='^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[A-Za-z0-9_-]+/[0-9a-f-]{36}$'
   [VPC_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
   [ALB_CERTIFICATE_ARN]='^(arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[0-9a-f-]{36})?$'

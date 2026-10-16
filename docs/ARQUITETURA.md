@@ -68,7 +68,10 @@ flowchart LR
   end
   api -->|"TLS verify-full (ConfigMap rds-ca)"| rds[("RDS PostgreSQL 17")]
   sm["Secrets Manager"] --> eso
-  gha["deploy-aws (OIDC, workflow_dispatch)"] -->|"SSM, ECR, branch gitops/aws, Argo CD"| eks
+  ci["CI: tests + image artifact"] --> pub["publish-images (manual, signed GHCR digests)"]
+  pub --> verify["deploy-aws verifies CI, SBOM, source and signer"]
+  verify --> gha["deploy-aws (OIDC + approved lab environment)"]
+  gha -->|"SSM, ECR digests, branch gitops/aws, Argo CD"| eks
 ```
 
 O namespace, o RBAC do deployer, o ClusterSecretStore, o controller do ALB, o WAF e o RDS são do
@@ -125,8 +128,10 @@ API → RDS); os valores do SSM (imagens, ARN do WAF, CIDR) entram por um `param
 13. **Segurança de pods.** Pod Security `restricted` em todo pod (inclusive o PostgreSQL do kind, uid
     70 e dados em `emptyDir`, efêmero de propósito), sem token de service account, NetworkPolicies
     que negam tudo e liberam só o necessário.
-14. **Imagens imutáveis.** No ECR, tag = SHA completo do commit (tags IMMUTABLE no tx01v2); o deploy
-    não reconstrói uma tag que já existe. Localmente a tag é `e2e` (kind) ou `local` (compose).
+14. **Imagens imutáveis.** O CI constrói uma vez e guarda o artefato testado; publish-images assina e
+    publica o digest no GHCR. deploy-aws valida CI, SBOM e identidade da assinatura, copia para a tag ECR
+    imutável do SHA, confirma o image ID e fixa o digest ECR nos manifests GitOps. Localmente a tag é
+    e2e (kind) ou local (compose).
 15. **Um smoke test para todos os ambientes.** `e2e/smoke.mjs` (Node.js puro, sem dependências) roda
     contra o compose, o kind e o ALB; na AWS, `SMOKE_BEHIND_WAF=1` espera o 403 do WAF para corpos
     acima de 8 KB, em vez do 413 da API.

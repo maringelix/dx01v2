@@ -43,7 +43,7 @@ The lab family (v2):
 | Images: build, numeric non-root user, no npm or shell in the API runtime, trivy HIGH/CRITICAL gate | `verified in CI` | `make build`; CI job `images` |
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
-| AWS deploy (ECR, EKS of tx01v2, ExternalSecrets, ALB + WAF, traces to the OpenTelemetry Collector and AWS X-Ray, smoke test; the workflow uses Argo CD GitOps, with direct push available through the script) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| AWS deploy (verified GHCR release, digest promotion to ECR, EKS of tx01v2, GitOps, ExternalSecrets, ALB + WAF, traces to X-Ray, smoke test) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
@@ -58,6 +58,13 @@ The lab family (v2):
 `verified in CI` rows run on every pull request, on every push to `main` and weekly (CI jobs in the
 Evidence column); the compose row is verified locally only. The AWS row changes only with a
 `cloud_run_report` issue (date, region, commits, cost, smoke output, leftovers).
+
+## Security pipeline
+
+The CI includes CodeQL `security-extended`, a real SonarQube Community Build quality gate with LCOV,
+Trivy dependency and image scans, and OWASP ZAP Baseline against an isolated local Compose stack.
+Sonar has no paid-service or production-secret dependency. The limits and evidence for each check are
+in [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md). Run `make build && make dast` locally for DAST.
 
 ## Architecture
 
@@ -110,9 +117,9 @@ defaults, including the ALB this app creates (reference list prices, see the
 [tx01v2 cost doc](https://github.com/maringelix/tx01v2/blob/main/docs/CUSTOS.md)). A forgotten lab
 costs more than US$40 per week. Use a dedicated AWS account and destroy on the same day.
 
-Follow [docs/RUNBOOK.md](docs/RUNBOOK.md): tx01v2 bootstrap/apply/platform → GitHub variables of
-dx01v2 → `deploy-aws` workflow (Argo CD GitOps) → smoke test through
-the ALB → tx01v2 destroy + leftover check → `cloud_run_report` issue.
+Follow [docs/RUNBOOK.md](docs/RUNBOOK.md): tx01v2 bootstrap/apply/platform → GitHub variables →
+CI image artifact → manual signed GHCR publication → digest-verified deploy-aws promotion to ECR and
+Argo CD → smoke test through the ALB → tx01v2 destroy + leftover check → cloud_run_report issue.
 
 ## Harness
 

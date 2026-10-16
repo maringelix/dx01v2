@@ -27,7 +27,7 @@ export default defineConfig({
       include: ['src/**/*.{ts,tsx}'],
       // main.tsx only mounts <App /> into #root; everything it renders is covered through App.
       exclude: ['src/test/**', 'src/main.tsx'],
-      reporter: ['text-summary', 'text', 'json-summary'],
+      reporter: ['text-summary', 'text', 'json-summary', 'lcov'],
       reportsDirectory: 'coverage',
       thresholds: { lines: 70 },
     },

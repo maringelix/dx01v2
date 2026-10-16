@@ -16,7 +16,7 @@ Ele vive em `scripts/harness.sh`; o `Makefile` e o CI só o chamam. O que passa 
 | Lint, formato e tipos | `eslint`, `prettier`, `typecheck:api`, `typecheck:web` | regras type-aware do typescript-eslint, React hooks, formatação, TypeScript estrito | comportamento | local, CI |
 | Dockerfiles, workflows e scripts | `hadolint`, `actionlint` (com shellcheck), `shellcheck` | boas práticas de Dockerfile, YAML e bash corretos (nível style) | comportamento contra a nuvem | local, CI |
 | Manifests | `kubeconform`, `contract-app`, `trivy-config` | overlays `local`, `aws` e `aws-https` renderizados e válidos (estrito, Kubernetes 1.36, CRD do ESO); asserções do contrato e de hardening (`scripts/check-manifests.mjs`); sem HIGH/CRITICAL de configuração | admission e comportamento no cluster (ver e2e) | local, CI (rede) |
-| Segredos | `gitleaks` | nenhum segredo conhecido (histórico completo quando há commits) | segredos fora dos padrões do gitleaks | local, CI |
+| Segredos | `gitleaks`, `gitleaks-negative-gate` | arquivos visíveis ao Git e histórico; falha se o scanner diz que não encontrou nada sem reportar commits lidos; fixture aleatória confirma a regra `github-pat` e a redação do relatório | segredos fora dos padrões do gitleaks | local, CI |
 | Testes da API | `test:api` | unitários e de integração com supertest contra o app real e um PostgreSQL 17 real: migrações idempotentes, fluxos de criar/listar/apagar, 400/401/404/413/415/429/503, XFF falso não fura o limite, readyz 200/503, recuperação do banco, desligamento gracioso; cobertura >= 80 % linhas e >= 70 % branches | TLS com o RDS, várias réplicas | local, CI (Docker ou `DB_*`) |
 | Testes da página | `test:web` | lista, envio com sucesso e erro, validação, modo admin (fetch simulado), cobertura >= 70 % linhas | navegador real, CSP aplicada pelo navegador | local, CI |
 | Build | `npm-build`, `image:*`, `image-policy:*` | `tsc` e `vite build`; as duas imagens; usuário numérico não root, labels OCI, sem npm/npx/corepack nem shell no runtime da API | comportamento em runtime (ver e2e) | local, CI (Docker) |
@@ -33,9 +33,9 @@ do CI): ver `docs/RUNBOOK.md`.
 |---|---|---|
 | `static` | `make tools && make static` | `static` |
 | `test` | `make test` (service `postgres:17-alpine` por digest, `DB_*` no ambiente) | `test` |
-| `images` | build com buildx + cache do GitHub Actions, depois `make tools && make build` com `IMAGES_PREBUILT=1`; as duas imagens viram um artefato | `build` |
+| `images` | build com buildx + cache do GitHub Actions, depois `make tools && make build` com `IMAGES_PREBUILT=1`; as imagens testadas, IDs e checksum do tar viram artefato por 14 dias | `build` |
 | `e2e` | carrega o artefato, `bash scripts/install-tools.sh kind kubectl`, `make e2e` com `E2E_SKIP_BUILD=1`; diagnósticos como artefato em caso de falha | `e2e` |
-| `e2e-platform` | carrega o artefato, `make e2e-platform` com `E2E_SKIP_BUILD=1`: clona o tx01v2 no commit de `deploy/local/tx01v2.ref`, sobe o lab local completo, faz o deploy GitOps e roda as sondas (`docs/LAB_LOCAL.md`); diagnósticos como artefato | `platform` |
+| `e2e-platform` | carrega o artefato aprovado e a versao anterior, sobe o lab local completo, migra e atualiza via GitOps com trafego continuo; rejeita imagem indisponivel e restaura a versao anterior sem perder dados; diagnosticos como artefato | `platform` |
 | `e2e-platform-small` | carrega o artefato, `make e2e-platform-small` com `E2E_SKIP_BUILD=1`: o mesmo e2e com `LOCAL_SIZE=small` dentro de um Docker-in-Docker limitado a 7 GB, sem swap; picos de memória e OOM kills no resumo do job; diagnósticos como artefato. Não é check exigido | `platform-small` |
 
 Os ids `static`, `test`, `images`, `e2e` e `e2e-platform` são estáveis: são os checks exigidos pelo
@@ -44,6 +44,35 @@ impede que mudem sem querer. Checks novos: `promtool-rules` (estático: `promtoo
 das regras de alerta do overlay `local-platform`), `platform-e2e` (estágio `platform`) e
 `platform-small-e2e` (estágio `platform-small`, que nunca entra no `all`: é pesado e foi feito para o
 runner do CI).
+
+## Checks de segurança R7
+
+`static` inclui `trivy-filesystem`, que lê lockfiles e bloqueia CVEs corrigíveis HIGH/CRITICAL; o
+scan de configuração e as imagens mantêm os seus gates. O check de histórico do Gitleaks exige um
+contador de commits maior que zero para aceitar uma varredura limpa; o `gitleaks-negative-gate` cria
+um token aleatório em diretório temporário, espera a regra `github-pat` rejeitá-lo e confirma que o
+relatório redige o valor. `test` roda CodeQL no Actions com SARIF local,
+sem permissão para upload em Code Scanning; o parser do harness bloqueia severidade de segurança
+`>= 7.0` e severity ausente em findings de segurança. Localmente, sem `CODEQL_SARIF_PATH`, o mesmo
+check executa o autoteste negativo do parser; no CI também avalia o relatório real do CodeQL.
+
+O workflow também inicia SonarQube e PostgreSQL descartáveis, gera tokens de análise por projeto,
+instala scanner com SHA256 conferido e importa LCOV. A fixture `security/fixtures/sonar/uncovered.ts`
+precisa reprovar um gate descartável em `coverage` (menos de 80%); o scanner e o resultado dessa
+análise específica são checados pelo script `scripts/test-sonar-gate.sh`.
+
+`make dast` executa o check `zap-baseline` fora de `make all`: usa as imagens pré-construídas, sobe e
+remove um Compose temporário, aponta o ZAP Baseline + Ajax Spider somente para loopback e guarda o
+relatório fora do repositório. Rode `make build` antes do DAST local.
+
+O workflow publish-images e manual e nao recompila: recebe o ID de uma execucao ci.yml bem-sucedida
+em main, compara o commit, os cinco checks obrigatorios, os IDs das imagens e o checksum do tar; publica
+as mesmas imagens no GHCR e anexa proveniencia SLSA e SBOM SPDX com assinatura Sigstore keyless. O
+workflow deploy-aws recebe o ID dessa publicacao, confere novamente a execucao CI, os checks, hashes de
+SBOM, digest e identidade exata de assinatura antes da aprovacao do environment lab. Apos a aprovacao,
+copia para ECR sem rebuild, valida o image ID e registra os digests na revisao GitOps. Nenhum desses
+checks locais executa ou altera uma nuvem.
+O CI anexa o relatorio por sete dias. Detalhes e limites: docs/SEGURANCA_CI.md.
 
 ## Modo estrito
 
