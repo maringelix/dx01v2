@@ -49,23 +49,28 @@ export function createMeshDemoServer(
   });
 }
 
-export function main(env: NodeJS.ProcessEnv = process.env): void {
+export function main(
+  env: NodeJS.ProcessEnv = process.env,
+  writeOut: (line: string) => void = (line) => process.stdout.write(`${line}\n`),
+  writeError: (line: string) => void = (line) => process.stderr.write(`${line}\n`),
+): Server | undefined {
   const variant = env.MESH_VARIANT;
   if (variant !== 'stable' && variant !== 'canary') {
-    process.stderr.write('mesh-demo: MESH_VARIANT must be stable or canary\n');
+    writeError('mesh-demo: MESH_VARIANT must be stable or canary');
     process.exitCode = 1;
-    return;
+    return undefined;
   }
   const portValue = env.PORT ?? '3000';
   if (!/^[0-9]+$/.test(portValue) || Number(portValue) < 1 || Number(portValue) > 65535) {
-    process.stderr.write('mesh-demo: PORT must be a TCP port\n');
+    writeError('mesh-demo: PORT must be a TCP port');
     process.exitCode = 1;
-    return;
+    return undefined;
   }
-  const server = createMeshDemoServer(variant);
+  const server = createMeshDemoServer(variant, writeOut);
   server.listen(Number(portValue), '0.0.0.0', () => {
-    process.stdout.write(`mesh-demo: ${variant} listening on ${portValue}\n`);
+    writeOut(`mesh-demo: ${variant} listening on ${portValue}`);
   });
+  return server;
 }
 
 if (isMain(import.meta.url)) {

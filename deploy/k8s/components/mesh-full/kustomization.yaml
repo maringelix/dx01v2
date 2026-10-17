@@ -2,6 +2,12 @@
 # and tx01v2's local-platform overlay supply the deploy-params ConfigMap used for the approved API image.
 apiVersion: kustomize.config.k8s.io/v1alpha1
 kind: Component
+labels:
+  - pairs:
+      cost.lab/owner: learner
+      cost.lab/environment: lab
+    includeSelectors: false
+    includeTemplates: true
 resources:
   - mesh-demo.yaml
   - mesh-policy.yaml

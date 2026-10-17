@@ -7,6 +7,8 @@ kind: Kustomization
 labels:
   - pairs:
       app.kubernetes.io/part-of: dx01v2
+      cost.lab/owner: learner
+      cost.lab/environment: lab
     includeSelectors: false
     includeTemplates: true
 resources:

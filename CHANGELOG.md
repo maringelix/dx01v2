@@ -214,3 +214,7 @@ All notable changes to this project are documented here. The format follows
 - Dependabot ignores major bumps of the `node` build image (it follows `.nvmrc` and `engines.node`;
   a `node:26` bump fails `npm ci` with EBADENGINE).
 - docs/SUSTENTACAO.md, "Estado atual": the stages say `verificado no CI` (the README already did).
+
+## R10: capacidade e FinOps
+
+Veja [Capacidade e SLO](docs/FINOPS.md) para carga limitada, HPA up/down, PDB/drain, rightsizing, pool PostgreSQL e showback. Prova Docker em Actions; nada executado na nuvem (v2).
