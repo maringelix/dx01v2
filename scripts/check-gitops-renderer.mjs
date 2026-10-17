@@ -18,7 +18,10 @@ const manifests = parseAllDocuments(readFileSync(manifestsFile, 'utf8'))
   .map((doc) => doc.toJS())
   .filter(Boolean);
 const source = document.spec?.source;
-if (typeof source?.path !== 'string' || !/^deploy\/k8s\/overlays\/(aws|aws-https)$/.test(source.path)) {
+if (
+  typeof source?.path !== 'string' ||
+  !/^deploy\/k8s\/overlays\/(aws|aws-https|aws-full|aws-https-full)$/.test(source.path)
+) {
   fail(`unexpected source path: ${source?.path}`);
 }
 
@@ -58,7 +61,7 @@ for (const override of images) {
 
 const patches = source?.kustomize?.patches ?? [];
 if (patches.length === 0) fail('the Application has no cloud-specific Kustomize patches');
-const https = source.path.endsWith('/aws-https');
+const https = source.path.endsWith('aws-https') || source.path.endsWith('aws-https-full');
 const ingressHostPatch = patches.flatMap((entry) => {
   if (entry.target?.kind !== 'Ingress' || entry.target?.name !== 'dx01v2') return [];
   try {

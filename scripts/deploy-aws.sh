@@ -13,6 +13,7 @@
 #   GIT_SHA              optional; if set, must equal the release manifest source commit
 #   DEPLOY_MODE          auto (default: use GitOps when the Argo CD Application exists, otherwise
 #                        apply directly); or force gitops/push
+#   PLATFORM_PROFILE     core|full; must match the profile installed by tx01v2/platform.yml
 #                        (apply the cloud overlay directly; use only when Argo CD is not managing it)
 #   GITHUB_TOKEN         optional in a laptop session; Actions provides it for the GitOps branch push
 #   ARGO_SYNC_TIMEOUT    seconds to wait for the GitOps Application (default 600)
@@ -39,6 +40,7 @@ SSM_NAMES=(
   "$SSM_PREFIX/cluster-name"
   "$SSM_PREFIX/vpc-id"
   "$SSM_PREFIX/vpc-cidr"
+  "$SSM_PREFIX/alb/source-cidr"
   "$SSM_PREFIX/ecr/api-url"
   "$SSM_PREFIX/ecr/web-url"
   "$SSM_PREFIX/waf/acl-arn"
@@ -78,6 +80,8 @@ WEB_IMAGE=""
 ALB_HOSTNAME=""
 BASE=""
 DEPLOY_MODE="${DEPLOY_MODE:-auto}"
+PLATFORM_PROFILE="${PLATFORM_PROFILE:-core}"
+PROMOTE_ONLY=false
 ARGO_SYNC_TIMEOUT="${ARGO_SYNC_TIMEOUT:-600}"
 GITOPS_REV=""
 
@@ -157,6 +161,8 @@ preflight() {
   [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]+$ ]] || die "AWS_REGION does not look like a region: $AWS_REGION"
   [[ "$DEPLOY_MODE" == auto || "$DEPLOY_MODE" == gitops || "$DEPLOY_MODE" == push ]] ||
     die "DEPLOY_MODE must be auto, gitops or push"
+  [[ "$PLATFORM_PROFILE" == core || "$PLATFORM_PROFILE" == full ]] ||
+    die "PLATFORM_PROFILE must be core or full"
   if [[ ! "$ARGO_SYNC_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
     die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
   fi
@@ -194,7 +200,6 @@ read_contract() {
         die "DNS contract is inconsistent: disabled must use disabled sentinels for domain, zone and certificate"
       APP_DOMAIN_NAME=disabled
       ALB_CERTIFICATE_ARN=""
-      OVERLAY=aws
       ;;
     true)
       [[ "$APP_DOMAIN_NAME" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]] ||
@@ -202,10 +207,16 @@ read_contract() {
       [[ "$zone_id" =~ ^Z[A-Z0-9]+$ ]] || die "DNS contract has an invalid public Route53 hosted zone ID"
       [[ "$ALB_CERTIFICATE_ARN" =~ ^arn:aws[a-z-]*:acm:${AWS_REGION}:[0-9]{12}:certificate/[0-9a-f-]{36}$ ]] ||
         die "DNS contract has no validated ACM certificate in $AWS_REGION"
-      OVERLAY=aws-https
       ;;
     *) die "DNS contract dns/enabled must be true or false" ;;
   esac
+  if [[ "$PLATFORM_PROFILE" == full ]]; then
+    if [[ "$DNS_ENABLED" == true ]]; then OVERLAY=aws-https-full; else OVERLAY=aws-full; fi
+  elif [[ "$DNS_ENABLED" == true ]]; then
+    OVERLAY=aws-https
+  else
+    OVERLAY=aws
+  fi
   [[ "$(param ecr/api-url)" =~ ${ECR_URL_PATTERN}api$ ]] || die "SSM $SSM_PREFIX/ecr/api-url is not the URL of the dx01v2/api repository"
   [[ "$(param ecr/web-url)" =~ ${ECR_URL_PATTERN}web$ ]] || die "SSM $SSM_PREFIX/ecr/web-url is not the URL of the dx01v2/web repository"
   API_IMAGE="$(param ecr/api-url):$GIT_SHA"
@@ -247,12 +258,31 @@ publish_images() {
   log "promoted the signed release to ECR by immutable digest; no image was rebuilt"
 }
 
+write_github_outputs() {
+  [[ -n "${GITHUB_OUTPUT:-}" ]] || return 0
+  [[ "$API_IMAGE" == *@sha256:* && "$WEB_IMAGE" == *@sha256:* ]] || die "refusing to publish invalid ECR image outputs"
+  {
+    printf 'api_name=%s\n' "${API_IMAGE%@*}"
+    printf 'api_digest=%s\n' "${API_IMAGE##*@}"
+    printf 'web_name=%s\n' "${WEB_IMAGE%@*}"
+    printf 'web_digest=%s\n' "${WEB_IMAGE##*@}"
+  } >>"$GITHUB_OUTPUT"
+}
+
 connect_cluster() {
   export KUBECONFIG="$WORK_DIR/kubeconfig"
   aws eks update-kubeconfig --name "$(param cluster-name)" --region "$AWS_REGION" --kubeconfig "$KUBECONFIG" \
     --alias dx01v2-lab >/dev/null
   [[ "$(kubectl auth can-i create deployments.apps -n "$NAMESPACE")" == yes ]] ||
     die "this principal cannot deploy to namespace $NAMESPACE: it needs an EKS access entry in the group dx01v2-deployers (tx01v2 app_deployer_principal_arns) and the tx01v2 platform layer (Role dx01v2-deployer)"
+  if [[ "$PLATFORM_PROFILE" == full ]]; then
+    [[ "$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}')" == ambient ]] ||
+      die "PLATFORM_PROFILE=full needs tx01v2/platform.yml profile full (namespace $NAMESPACE is not in ambient mode)"
+    [[ "$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels.istio\.io/use-waypoint}')" == dx01v2-waypoint ]] ||
+      die "PLATFORM_PROFILE=full needs the dx01v2-waypoint waypoint installed by tx01v2"
+    [[ "$(kubectl -n "$NAMESPACE" get gateway dx01v2-waypoint -o jsonpath='{.status.conditions[?(@.type==\"Programmed\")].status}')" == True ]] ||
+      die "the dx01v2-waypoint Gateway is not Programmed"
+  fi
   if [[ "$DEPLOY_MODE" == auto ]]; then
     DEPLOY_MODE="$(resolve_aws_deploy_mode "$DEPLOY_MODE")" ||
       die "cannot select a safe deploy mode; resolve Argo CD access and retry"
@@ -284,6 +314,7 @@ write_params() {
     echo "WEB_IMAGE=$WEB_IMAGE"
     echo "WAF_ACL_ARN=$(param waf/acl-arn)"
     echo "VPC_CIDR=$(param vpc-cidr)"
+    echo "ALB_SOURCE_CIDR=$(param alb/source-cidr)"
     echo "ALB_CERTIFICATE_ARN=$ALB_CERTIFICATE_ARN"
     echo "APP_DOMAIN_NAME=$APP_DOMAIN_NAME"
   } >"$params"
@@ -436,7 +467,11 @@ smoke() {
 }
 
 main() {
-  (($# == 0)) || die "usage: $0 (configuration through environment variables, see the header)"
+  if (($# == 1)) && [[ "$1" == --promote-only ]]; then
+    PROMOTE_ONLY=true
+  elif (($# != 0)); then
+    die "usage: $0 [--promote-only] (configuration through environment variables, see the header)"
+  fi
   preflight
   WORK_DIR="$(mktemp -d)"
   trap cleanup EXIT
@@ -444,6 +479,11 @@ main() {
   read_contract
   section "signed release $GIT_SHA: promote GHCR digests to ECR"
   publish_images
+  write_github_outputs
+  if [[ "$PROMOTE_ONLY" == true ]]; then
+    log "promotion complete; the workflow will attest the ECR digests before deploying them"
+    return 0
+  fi
   section "cluster $(param cluster-name): kubeconfig and RBAC"
   connect_cluster
   section "ConfigMap rds-ca ($AWS_REGION bundle)"

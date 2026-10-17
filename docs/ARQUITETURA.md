@@ -122,9 +122,11 @@ API → RDS); os valores do SSM (imagens, ARN do WAF, CIDR) entram por um `param
     método, padrão de rota — `unmatched` para 404 — e status). Nem o web nem o Ingress expõem essa
     porta; a NetworkPolicy só aceita o namespace `monitoring` (não há Prometheus neste lab).
     O formato é OpenMetrics, para o exemplar com o `trace_id` da requisição.
-12. **Kustomize com componentes.** `base` neutra; `overlays/local` (kind) e `overlays/aws` /
-    `aws-https` (componentes `aws` e `aws-https`). Na AWS o HPA controla as réplicas da API
-    (`spec.replicas` removido). O CI renderiza e valida todos os overlays com `params.example.env`.
+12. **Kustomize com componentes.** `base` neutra; `overlays/local` (kind) e `overlays/aws`,
+    `aws-https`, `aws-full` e `aws-https-full`. Os overlays `full` acrescentam o exercício de mesh
+    ambient; na AWS, `platform_profile` precisa coincidir com a plataforma tx01v2. O HPA controla as
+    réplicas da API (`spec.replicas` removido). O CI renderiza e valida todos os overlays com
+    `params.example.env`.
 13. **Segurança de pods.** Pod Security `restricted` em todo pod (inclusive o PostgreSQL do kind, uid
     70 e dados em `emptyDir`, efêmero de propósito), sem token de service account, NetworkPolicies
     que negam tudo e liberam só o necessário.

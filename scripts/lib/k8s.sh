@@ -6,7 +6,7 @@ K8S_DIR="$REPO_ROOT/deploy/k8s"
 K8S_PARAMS_EXAMPLE="$K8S_DIR/components/aws/params.example.env"
 K8S_LOCAL_PARAMS_EXAMPLE="$K8S_DIR/components/local-platform/params.example.env"
 # shellcheck disable=SC2034 # used by the scripts that source this file
-K8S_OVERLAYS=(local aws aws-https local-platform)
+K8S_OVERLAYS=(local aws aws-https aws-full aws-https-full local-platform)
 
 # Formats accepted for every deploy parameter of the local-platform overlay (values come from the
 # ConfigMap lab-system/lab-contract of the tx01v2 local lab).
@@ -25,6 +25,7 @@ declare -A K8S_PARAM_PATTERN=(
   [WEB_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/web(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [WAF_ACL_ARN]='^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[A-Za-z0-9_-]+/[0-9a-f-]{36}$'
   [VPC_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
+  [ALB_SOURCE_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
   [ALB_CERTIFICATE_ARN]='^(arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[0-9a-f-]{36})?$'
   [APP_DOMAIN_NAME]='^(disabled|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+)$'
 )

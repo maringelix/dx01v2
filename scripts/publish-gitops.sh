@@ -4,7 +4,7 @@
 set -euo pipefail
 
 usage() {
-  echo "usage: $0 <aws> <aws|aws-https> <source-commit-sha> <api-digest> <web-digest>" >&2
+  echo "usage: $0 <aws> <aws|aws-https|aws-full|aws-https-full> <source-commit-sha> <api-digest> <web-digest>" >&2
   exit 2
 }
 
@@ -18,7 +18,7 @@ web_digest=$5
 [[ "$revision" =~ ^[0-9a-f]{40}$ ]] || usage
 [[ "$api_digest" =~ ^sha256:[0-9a-f]{64}$ && "$web_digest" =~ ^sha256:[0-9a-f]{64}$ ]] || usage
 case "$cloud:$overlay" in
-  aws:aws|aws:aws-https) ;;
+  aws:aws|aws:aws-https|aws:aws-full|aws:aws-https-full) ;;
   *) usage ;;
 esac
 

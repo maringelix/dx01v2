@@ -7,6 +7,12 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Added
 
+- Complete the dx side of R8.1–R8.4 with the version 6 AWS contract, separate `core|full` deploy
+  overlays, and an isolated mesh canary exercise. The workflow attests promoted ECR digests with its
+  keyless GitHub identity; tx01v2's Kyverno policy checks that exact signer before admitting app
+  Pods. The application, mesh probes, and contract render are covered by CI; AWS runtime remains
+  `not run in the cloud (v2)`.
+
 - R8.1 AWS DNS/TLS integration: the deployment consumes the v5 tx01v2 SSM contract, selects HTTPS
   only when Route53 and ACM are enabled, routes the configured hostname, and derives its smoke URL
   from that contract. No manually supplied certificate ARN or DNS URL is needed.

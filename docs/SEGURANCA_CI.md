@@ -82,6 +82,15 @@ confere de novo o publisher, a execucao CI, seus cinco checks, os hashes dos SBO
 Depois da aprovacao copia os digests verificados para ECR sem rebuild, valida igualdade do image ID e
 publica os manifests por digest no Argo CD. Isso nao configura nem altera contas cloud.
 
+O deploy assina tambem cada digest de destino ECR com um predicado in-toto que liga a execucao de
+promocao ao commit, repositorio e digest da imagem de origem. A verificacao exige a identidade exata
+de `.github/workflows/deploy-aws.yml` em `refs/heads/main`, o emissor GitHub Actions, o repositorio e
+o SHA do source antes de aplicar os manifests. No perfil `full`, a `ImageValidatingPolicy` do Kyverno
+aceita apenas os digests dos repositorios `dx01v2/api` e `dx01v2/web` com essa attestation;
+`failurePolicy: Fail` e `validationActions: Deny` bloqueiam imagens sem prova ou falhas do verificador.
+O harness valida o predicado e a configuracao renderizada; a leitura privada e a admissao no ECR ainda
+nao foram executadas em nuvem (v2).
+
 
 ## Aula: provar que o gate bloqueia
 

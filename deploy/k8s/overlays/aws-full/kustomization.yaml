@@ -1,0 +1,11 @@
+# AWS EKS full profile: the ALB edge plus the app-scoped ambient mesh exercise. The deploy selects
+# this overlay only when PLATFORM_PROFILE=full and verifies the tx01v2 waypoint first.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dx01v2
+resources:
+  - ../../base
+  - gitops-revision.yaml
+components:
+  - ../../components/aws
+  - ../../components/mesh-full

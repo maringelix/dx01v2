@@ -1,8 +1,13 @@
-# Contrato tx01v2 <-> dx01v2 — versão 5 (2026-10-16)
+# Contrato tx01v2 <-> dx01v2 — versão 6 (2026-10-16)
 
 Versão 5 recebe do tx01v2 a configuração opcional de Route53/ACM: o deploy lê quatro valores DNS
 adicionais no SSM, escolhe `aws-https` pelo contrato e define o hostname do Ingress sem variáveis
 manuais de certificado ou URL (R8.1).
+
+Versão 6 recebe `alb/source-cidr` no SSM e restringe a NetworkPolicy de entrada do web às subnets
+públicas do ALB. `vpc-cidr` fica apenas no egress da API para o RDS. O workflow de deploy também pede
+o perfil `core|full`, que deve coincidir com o perfil instalado pelo tx01v2; `full` acrescenta o
+overlay de mesh e exige o waypoint ativo (R8.1/R8.2).
 
 Versão 4: a camada `full` integra o app ao Istio ambient e ao Gatekeeper e registra no Argo CD a
 revisão `gitops/aws`; o grupo `dx01v2-deployers` pode pedir refresh da Application `dx01v2` (R4.1/R4.4).
@@ -22,7 +27,7 @@ repositórios e incremento da versão.
 | Nomes de Services, portas, probes, Secrets, ConfigMap, Ingress (classe, anotações, rotas, health checks), ExternalSecrets, HPA, NetworkPolicies, só tipos que a Role `dx01v2-deployer` pode escrever | check `contract-app` (`scripts/check-manifests.mjs` sobre os overlays renderizados) | `verificado localmente` |
 | Endpoint OTLP da versão 2 no ConfigMap da API e NetworkPolicy só até o Collector (namespace `observability`, porta 4318) | check `contract-app` | `verificado localmente` |
 | Manifests válidos para Kubernetes 1.36 e para o CRD `ExternalSecret` (`external-secrets.io/v1`) | check `kubeconform` (estrito) | `verificado localmente` |
-| O deploy lê exatamente os 14 parâmetros SSM abaixo, com o prefixo `/tx01v2/lab`, e cria o `rds-ca` a partir do bundle oficial | check `contract-app` (greps em `scripts/deploy-aws.sh`) | `verificado em CI` após merge |
+| O deploy lê exatamente os 16 parâmetros SSM abaixo, com o prefixo `/tx01v2/lab`, e cria o `rds-ca` a partir do bundle oficial | check `contract-app` (greps em `scripts/deploy-aws.sh`) | `verificado em CI` após merge |
 | Formatos dos valores vindos do SSM (URLs do ECR, ARN do WAF, CIDR da VPC, ARN do ACM) | `k8s_validate_params` em `scripts/lib/k8s.sh` (renderização com `params.example.env`) | `verificado localmente` |
 | Valores fixos (`cluster-name`, nomes dos segredos, ClusterSecretStore) iguais aos do SSM | `scripts/deploy-aws.sh` falha antes de aplicar qualquer coisa | `não executado em nuvem (v2)` |
 | Comportamento real na AWS | `docs/RUNBOOK.md` | `não executado em nuvem (v2)` |
@@ -34,7 +39,7 @@ repositórios e incremento da versão.
 | Região AWS | variável Terraform `aws_region` do tx01v2, padrão `us-east-1` (variável `AWS_REGION` do GitHub aqui) |
 | Prefixo de nomes | `tx01v2-lab` |
 | Cluster EKS | `tx01v2-lab`, Kubernetes `1.36` (suporte padrão do EKS até 2027-08-02) |
-| Namespace do app | `dx01v2` — criado pela camada de plataforma do tx01v2 com os labels `pod-security.kubernetes.io/enforce=restricted`, `pod-security.kubernetes.io/enforce-version=latest`, `elbv2.k8s.aws/pod-readiness-gate-inject=enabled`. Os overlays `aws*` não criam o namespace; o overlay `local` cria um equivalente para o kind |
+| Namespace do app | `dx01v2` — criado pela camada de plataforma do tx01v2 com os labels `pod-security.kubernetes.io/enforce=restricted`, `pod-security.kubernetes.io/enforce-version=latest`, `elbv2.k8s.aws/pod-readiness-gate-inject=enabled`. O perfil `full` também o coloca no ambient mesh e instala o waypoint; os overlays `aws*` não criam o namespace |
 | Grupo Kubernetes do deployer | `dx01v2-deployers`, ligado no namespace `dx01v2` (RoleBinding `dx01v2-deployers`) à Role `dx01v2-deployer` |
 | Repositórios ECR | `dx01v2/api`, `dx01v2/web` — tags IMMUTABLE, scan on push; o workflow promove a imagem aprovada do GHCR sem rebuild e fixa o digest ECR nos manifests |
 | Papel OIDC do deploy | `dx01v2-gha-deploy` (criado pelo bootstrap do tx01v2) |
@@ -50,6 +55,9 @@ conter (o check `contract-app` recusa qualquer outro tipo):
 - `networking.k8s.io`: ingresses, networkpolicies → CRUD completo
 - `autoscaling`: horizontalpodautoscalers → CRUD completo; `policy`: poddisruptionbudgets → CRUD completo
 - `external-secrets.io`: externalsecrets → CRUD completo
+
+O perfil `full` adiciona a Role `dx01v2-deployer-full` no tx01v2 para `HTTPRoute`, `DestinationRule`
+e `AuthorizationPolicy`. O AppProject de Argo CD libera esses tipos somente no perfil `full`.
 
 Com o perfil `full` do `tx01v2`, o Argo CD é o dono dos manifests do app. O deploy configura o caminho,
 as imagens e os valores reais em `spec.source.kustomize` da Application `dx01v2` no namespace `argocd`;
@@ -85,14 +93,15 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 | `region` | região AWS | conferido contra `AWS_REGION` |
 | `cluster-name` | `tx01v2-lab` | `aws eks update-kubeconfig` |
 | `vpc-id` | ID da VPC | lido e conferido (presença) |
-| `vpc-cidr` | CIDR da VPC | NetworkPolicies ALB → pods e API → RDS (`VPC_CIDR`) |
+| `vpc-cidr` | CIDR da VPC | egress da API para RDS (`VPC_CIDR`) |
+| `alb/source-cidr` | faixa CIDR das subnets públicas do ALB | ingress do web (`ALB_SOURCE_CIDR`) |
 | `ecr/api-url` | URL do repositório `dx01v2/api` | imagem da API (`API_IMAGE`) |
 | `ecr/web-url` | URL do repositório `dx01v2/web` | imagem do web (`WEB_IMAGE`) |
 | `waf/acl-arn` | ARN do web ACL WAFv2 REGIONAL | anotação `alb.ingress.kubernetes.io/wafv2-acl-arn` (`WAF_ACL_ARN`) |
 | `db/secret-name` | `tx01v2-lab/db/app` | conferido contra o ExternalSecret `db-credentials` |
 | `app/admin-token-secret-name` | `tx01v2-lab/app/admin-token` | conferido contra o ExternalSecret `app-secrets` |
 | `eso/cluster-secret-store` | `aws-secrets-manager` | conferido contra o `secretStoreRef` dos ExternalSecrets |
-| `dns/enabled` | `true` ou `false` | escolhe `aws-https` ou o overlay HTTP-only |
+| `dns/enabled` | `true` ou `false` | escolhe HTTP ou HTTPS, combinado ao perfil `core|full` |
 | `dns/domain-name` | hostname público do app ou `disabled` | host do Ingress e URL do smoke test |
 | `dns/zone-id` | hosted zone pública Route53 ou `disabled` | conferido antes de renderizar, não altera a zona no deploy |
 | `dns/acm-certificate-arn` | certificado validado ou `disabled` | listener HTTPS do ALB |
@@ -126,10 +135,13 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 - Services: `api` (porta 3000 http, 9464 métricas), `web` (porta 8080).
 - Com DNS habilitado, o Ingress `aws-https` define o hostname do contrato, associa o certificado ACM
   e redireciona HTTP para HTTPS; sem DNS permanece HTTP-only. O smoke test usa a URL do contrato.
-- Ingress (só AWS): classe `alb`, `internet-facing`, `target-type: ip`, HTTP 80 (HTTPS só se um ARN
-  de certificado ACM for informado: overlay `aws-https`), anotação
-  `alb.ingress.kubernetes.io/wafv2-acl-arn` vinda do SSM; `/api` → `api:3000`, `/` → `web:8080`;
-  health checks web `/healthz`, api `/readyz`.
+- Ingress (só AWS): classe `alb`, `internet-facing`, `target-type: ip`, HTTP 80 (HTTPS se DNS/ACM
+  estiverem configurados), anotação `alb.ingress.kubernetes.io/wafv2-acl-arn` vinda do SSM; `/` →
+  `web:8080`. O Nginx do web encaminha `/api` para `api:3000`. Só o web fica exposto pelo ALB e a
+  NetworkPolicy aceita entrada apenas da faixa `alb/source-cidr`; health check do ALB: web `/healthz`.
+- O workflow `deploy-aws` recebe `platform_profile=core|full`; DNS e perfil escolhem um dos quatro
+  overlays. `full` inclui o laboratório de canário/retries/circuit breaking e exige que o waypoint
+  ambient do tx01v2 esteja programado.
 - RDS PostgreSQL 17, porta 5432, acessível só a partir do security group do cluster EKS,
   `rds.force_ssl = 1`.
 

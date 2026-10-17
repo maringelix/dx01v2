@@ -60,7 +60,8 @@ REQUIRED_FILES=(
   scripts/sonar-bootstrap.sh scripts/sonar-service.sh scripts/install-sonar-scanner.sh scripts/test-sonar-gate.sh
   scripts/check-codeql-sarif.mjs scripts/test-gitleaks-gate.sh scripts/dast-zap.sh
   scripts/verify-ci-image-artifact.sh scripts/publish-ghcr-images.sh
-  scripts/get-publish-run-metadata.sh scripts/verify-release-bundle.sh
+  scripts/get-publish-run-metadata.sh scripts/verify-release-bundle.sh scripts/write-promotion-statements.sh
+  scripts/tests/promotion-statements.sh
   scripts/test-zap-gate.sh
   security/dast-baseline.conf
   docs/SEGURANCA_CI.md
@@ -72,6 +73,11 @@ REQUIRED_FILES=(
   api/migrations/0002_expand_message_display_name.sql
   scripts/e2e-platform.sh
   deploy/k8s/overlays/aws/gitops-revision.yaml deploy/k8s/overlays/aws-https/gitops-revision.yaml
+  deploy/k8s/overlays/aws-full/kustomization.yaml deploy/k8s/overlays/aws-full/gitops-revision.yaml
+  deploy/k8s/overlays/aws-https-full/kustomization.yaml deploy/k8s/overlays/aws-https-full/gitops-revision.yaml
+  deploy/k8s/components/mesh-full/kustomization.yaml deploy/k8s/components/mesh-full/mesh-demo.yaml
+  deploy/k8s/components/mesh-full/mesh-policy.yaml deploy/k8s/components/mesh-full/mesh-route.yaml
+  api/src/mesh-demo.ts api/src/mesh-probe.ts api/test/unit/mesh-demo.test.ts
 )
 STABLE_CI_JOBS=(static test images e2e e2e-platform)
 
@@ -586,8 +592,9 @@ check_contract_app() {
   render_overlays "$dir"
   node scripts/check-manifests.mjs --params "$K8S_PARAMS_EXAMPLE" --local-params "$K8S_LOCAL_PARAMS_EXAMPLE" \
     local="$dir/local.yaml" aws="$dir/aws.yaml" aws-https="$dir/aws-https.yaml" \
+    aws-full="$dir/aws-full.yaml" aws-https-full="$dir/aws-https-full.yaml" \
     local-platform="$dir/local-platform.yaml" || rc=1
-  for name in region cluster-name vpc-id vpc-cidr ecr/api-url ecr/web-url waf/acl-arn db/secret-name \
+  for name in region cluster-name vpc-id vpc-cidr alb/source-cidr ecr/api-url ecr/web-url waf/acl-arn db/secret-name \
     app/admin-token-secret-name eso/cluster-secret-store dns/enabled dns/domain-name dns/zone-id \
     dns/acm-certificate-arn; do
     grep -qF "\"\$SSM_PREFIX/$name\"" scripts/deploy-aws.sh || {
@@ -605,7 +612,7 @@ check_contract_app() {
   }
   example=deploy/k8s/components/aws/params.example.env
   mkdir -p "$dir/gitops-patches"
-  for overlay in aws aws-https; do
+  for overlay in aws aws-https aws-full aws-https-full; do
     if node scripts/render-gitops-application.mjs aws "$overlay" "$example" "$example" \
       >"$dir/gitops-patches/$overlay.json"; then
       node scripts/check-gitops-renderer.mjs "$dir/gitops-patches/$overlay.json" "$dir/$overlay.yaml" || rc=1
@@ -642,6 +649,7 @@ NODE
   expected_mode="DEPLOY_MODE=\"\${DEPLOY_MODE:-auto}\""
   if ! grep -qF 'default: auto' .github/workflows/deploy-aws.yml ||
     ! grep -qF "DEPLOY_MODE: \${{ inputs.deploy_mode }}" .github/workflows/deploy-aws.yml ||
+    ! grep -qF "PLATFORM_PROFILE: \${{ inputs.platform_profile }}" .github/workflows/deploy-aws.yml ||
     ! grep -qF 'contents: write' .github/workflows/deploy-aws.yml ||
     ! grep -qF "$expected_mode" scripts/deploy-aws.sh; then
     echo "deploy-aws must choose GitOps when the Argo CD Application exists and support direct apply for core"
@@ -660,6 +668,11 @@ NODE
 
 check_deploy_mode() {
   bash scripts/tests/deploy-mode.sh
+}
+
+check_promotion_statements() {
+  need jq
+  bash scripts/tests/promotion-statements.sh
 }
 
 check_trivy_config() {
@@ -928,6 +941,7 @@ register_checks() {
   register static policy-images check_policy_images
   register static policy-app check_policy_app
   register static deploy-mode check_deploy_mode
+  register static promotion-statements check_promotion_statements
   register static trivyignore-policy check_trivyignore_policy
   register static npm-ci check_npm_ci
   register static eslint check_eslint
@@ -1072,6 +1086,10 @@ main() {
     echo "no check matched HARNESS_ONLY='$HARNESS_ONLY'"
     return 1
   fi
+  grep -qF '[[ "$GITHUB_REF" == refs/heads/main ]]' .github/workflows/deploy-aws.yml || {
+    echo "deploy-aws must run from main so only its pinned workflow identity can sign ECR promotions"
+    return 1
+  }
   if ((FAIL_COUNT > 0)); then
     echo "failed: ${FAILED[*]}"
     return 1
