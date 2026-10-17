@@ -641,8 +641,11 @@ function localPlatformChecks(objs, params) {
     ]);
   eq(
     principals('api-require-waypoint'),
-    [[['cluster.local/ns/dx01v2/sa/dx01v2-waypoint'], ['3000', '9464']]],
-    `${overlay}: API ztunnel rejects pod-IP bypasses`,
+    [
+      [['cluster.local/ns/dx01v2/sa/dx01v2-waypoint'], ['3000', '9464']],
+      [['cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus'], ['9464']],
+    ],
+    `${overlay}: API ztunnel rejects application pod-IP bypasses and restricts direct Prometheus to metrics`,
   );
   eq(
     find(objs, 'AuthorizationPolicy', 'api')?.spec?.targetRefs,
@@ -675,8 +678,29 @@ function localPlatformChecks(objs, params) {
   );
   eq(
     principals('web'),
-    [[['cluster.local/ns/dx01v2/sa/dx01v2-istio'], ['8080']]],
+    [
+      [['cluster.local/ns/dx01v2/sa/dx01v2-istio'], ['8080']],
+      [['cluster.local/ns/monitoring/sa/opentelemetry-collector'], ['8080']],
+    ],
     `${overlay}: AuthorizationPolicy web`,
+  );
+  eq(
+    find(objs, 'AuthorizationPolicy', 'web')?.spec?.rules?.[1]?.to?.[0]?.operation,
+    { ports: ['8080'], methods: ['GET'], paths: ['/healthz'] },
+    `${overlay}: Collector has only the synthetic web health operation`,
+  );
+  eq(
+    find(objs, 'NetworkPolicy', 'api-metrics-mesh')?.spec?.ingress?.[0],
+    {
+      from: [
+        {
+          namespaceSelector: { matchLabels: { 'kubernetes.io/metadata.name': 'monitoring' } },
+          podSelector: { matchLabels: { 'app.kubernetes.io/name': 'prometheus' } },
+        },
+      ],
+      ports: [{ protocol: 'TCP', port: 15008 }],
+    },
+    `${overlay}: only Prometheus gets the direct authenticated metrics transport`,
   );
 
   eq(

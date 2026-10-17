@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Fixed
 
+- Keep pod-IP metrics scraping reachable only to the authenticated Prometheus identity on port
+  9464, while API traffic still requires the waypoint. The Collector's synthetic web probe is
+  limited to GET /healthz. Manifest checks enforce both narrow exceptions.
+
 - Permit HBONE on the generated Istio waypoint under namespace default-deny, with egress limited
   to the app, mesh demo, control plane and telemetry. AuthorizationPolicy still enforces client
   identity and HTTP rules; the waypoint Service remains ClusterIP.
