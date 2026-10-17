@@ -5,6 +5,13 @@ All notable changes to this project are documented here. The format follows
 [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## [Unreleased]
+### Fixed
+
+- The platform rollback exercise pins its mesh demo to the tested R8 API image while it deploys the
+  older application image. This keeps the mesh pods healthy when the earlier release predates the
+  mesh demo, and still exercises an actual previous app artifact. The workflow source check also
+  matches its main-branch expression literally without a ShellCheck false positive.
+
 ### Added
 
 - Complete the dx side of R8.1–R8.4 with the version 6 AWS contract, separate `core|full` deploy

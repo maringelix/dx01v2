@@ -1086,6 +1086,7 @@ main() {
     echo "no check matched HARNESS_ONLY='$HARNESS_ONLY'"
     return 1
   fi
+  # shellcheck disable=SC2016 # Match the literal expression in the workflow.
   grep -qF '[[ "$GITHUB_REF" == refs/heads/main ]]' .github/workflows/deploy-aws.yml || {
     echo "deploy-aws must run from main so only its pinned workflow identity can sign ECR promotions"
     return 1

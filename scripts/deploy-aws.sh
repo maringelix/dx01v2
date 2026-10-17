@@ -311,6 +311,7 @@ write_params() {
   local params="$WORK_DIR/params.env"
   {
     echo "API_IMAGE=$API_IMAGE"
+    echo "MESH_IMAGE=$API_IMAGE"
     echo "WEB_IMAGE=$WEB_IMAGE"
     echo "WAF_ACL_ARN=$(param waf/acl-arn)"
     echo "VPC_CIDR=$(param vpc-cidr)"

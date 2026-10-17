@@ -856,6 +856,14 @@ main() {
   lab up
   LAB_KUBECONFIG="$(lab kubeconfig | tail -n 1)"
   export KUBECONFIG="$LAB_KUBECONFIG"
+  # The R8 mesh exercise is independent of the app release being rolled back. Keep its
+  # image on this commit while the previous (pre-R8) API and web images are promoted.
+  local registry registry_push
+  registry="$(kubectl -n lab-system get configmap lab-contract -o go-template='{{ index .data "registry" }}')"
+  registry_push="$(kubectl -n lab-system get configmap lab-contract -o go-template='{{ index .data "registry-push" }}')"
+  docker tag dx01v2-api:e2e "$registry_push/dx01v2/api:$GIT_SHA"
+  docker push -q "$registry_push/dx01v2/api:$GIT_SHA" >/dev/null
+  export MESH_IMAGE="$registry/dx01v2/api:$GIT_SHA"
   GIT_SHA="$PREVIOUS_SHA" DEPLOY_IMAGES="dx01v2-api:previous dx01v2-web:previous" DEPLOY_ALLOW_DIRTY=1 \
     bash "$REPO_ROOT/scripts/deploy-local.sh"
   pass "gitops: deployed previous content $PREVIOUS_SHA from distinct image artifacts"
