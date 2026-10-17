@@ -1,0 +1,12 @@
+# Same full AWS profile with the ACM-backed HTTPS listener. Kept separate so core/full and HTTP/HTTPS
+# remain explicit in the deploy contract.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+namespace: dx01v2
+resources:
+  - ../../base
+  - gitops-revision.yaml
+components:
+  - ../../components/aws
+  - ../../components/aws-https
+  - ../../components/mesh-full

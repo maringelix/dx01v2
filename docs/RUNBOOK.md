@@ -99,16 +99,15 @@ Settings > Secrets and variables > Actions > **Variables** (aparecem nos logs: n
 |---|---|---|
 | `AWS_REGION` | `us-east-1` | região do lab; precisa ser igual a `/tx01v2/lab/region` |
 | `AWS_DEPLOY_ROLE_ARN` | `arn:aws:iam::<ACCOUNT_ID>:role/dx01v2-gha-deploy` | papel assumido por OIDC |
-| `ALB_CERTIFICATE_ARN` | `arn:aws:acm:us-east-1:<ACCOUNT_ID>:certificate/<ID>` | opcional: liga HTTPS (overlay `aws-https`, HTTP 80 redireciona para 443) |
-| `SMOKE_BASE_URL` | `https://app.example.com` | obrigatória com `ALB_CERTIFICATE_ARN`: um nome DNS do certificado com CNAME para o ALB (crie o registro quando o hostname do ALB aparecer) |
+| HTTPS/DNS | definido nos secrets opcionais do tx01v2 `LAB_APP_DOMAIN_NAME` e `LAB_ROUTE53_PUBLIC_ZONE_ID` | com os dois habilitados, o contrato seleciona o overlay HTTPS do perfil `core` ou `full`, ExternalDNS publica o host e o smoke test usa HTTPS automaticamente |
 
 ## 7. Deploy
 
 O deploy usa duas execucoes manuais no Actions:
 
 1. Na branch main, abra publish-images e informe ci_run_id de uma execucao CI push verde do mesmo commit. O workflow confirma os cinco jobs obrigatorios, confere o arquivo de imagens e publica no GHCR sem rebuild; anexa proveniencia Sigstore keyless e SBOM SPDX.
-2. Abra deploy-aws na branch main e informe release_run_id da execucao publish-images concluida. Antes da aprovacao do environment lab, o job valida CI, SBOM, digests e identidade exata do workflow/emissor. Depois da aprovacao, assume a role AWS por OIDC.
-3. O script promove os digests verificados do GHCR para ECR sem rebuild, confere que os image IDs continuam iguais, e publica os manifests GitOps apontando para os digests ECR. O modo padrao espera Argo CD, ExternalSecrets, rollouts e smoke test. Se o cluster nao usa Argo CD, execute com DEPLOY_MODE=push.
+2. Abra deploy-aws na branch main e informe release_run_id da execucao publish-images concluida. Escolha `platform_profile=core|full`, igual ao perfil instalado pelo tx01v2. Antes da aprovacao do environment lab, o job valida CI, SBOM, digests e identidade exata do workflow/emissor. Depois da aprovacao, assume a role AWS por OIDC.
+3. O script promove os digests verificados do GHCR para ECR sem rebuild, confere que os image IDs continuam iguais e assina a promocao dos digests ECR com a identidade deste workflow em `main`. O perfil `full` so inicia se o waypoint ambient do tx01v2 estiver programado; Kyverno exige a attestation da promocao para admitir os Pods do app. `auto` usa GitOps se encontrar a Application `dx01v2`; sem ela, aplica direto. Tambem e possivel forcar `gitops` ou `push` no workflow. Depois aguarda ExternalSecrets, rollouts e smoke test.
 
 O fluxo continua sem executar Terraform ou apagar recursos. O EKS, o ALB e o RDS faturam ate o teardown do tx01v2.
 

@@ -1,5 +1,6 @@
 # Contract: AWS Load Balancer Controller, class alb, internet-facing, target-type ip, HTTP 80,
-# WAF web ACL from SSM (/tx01v2/lab/waf/acl-arn). /api goes straight to the API, / to the web.
+# WAF web ACL from SSM (/tx01v2/lab/waf/acl-arn). The ALB reaches only the web edge; nginx proxies
+# /api to the API over the ambient mesh when the full platform profile is installed.
 apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
@@ -17,13 +18,6 @@ spec:
   rules:
     - http:
         paths:
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: api
-                port:
-                  number: 3000
           - path: /
             pathType: Prefix
             backend:

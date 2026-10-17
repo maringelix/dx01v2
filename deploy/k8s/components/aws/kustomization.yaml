@@ -63,17 +63,7 @@ patches:
           - name: rds-ca
             mountPath: /etc/rds-ca
             readOnly: true
-  # ALB target group health checks (target-type ip): web /healthz, api /readyz.
-  - target:
-      kind: Service
-      name: api
-    patch: |-
-      - op: add
-        path: /metadata/annotations
-        value:
-          alb.ingress.kubernetes.io/healthcheck-path: /readyz
-          alb.ingress.kubernetes.io/healthcheck-port: traffic-port
-          alb.ingress.kubernetes.io/success-codes: '200'
+  # ALB target group health checks (target-type ip): only the web edge /healthz is public.
   - target:
       kind: Service
       name: web
@@ -123,16 +113,16 @@ replacements:
     targets:
       - select:
           kind: NetworkPolicy
-          name: web-ingress-from-alb
-        fieldPaths:
-          - spec.ingress.0.from.0.ipBlock.cidr
-      - select:
-          kind: NetworkPolicy
-          name: api-ingress-from-alb
-        fieldPaths:
-          - spec.ingress.0.from.0.ipBlock.cidr
-      - select:
-          kind: NetworkPolicy
           name: api-egress-to-rds
         fieldPaths:
           - spec.egress.0.to.0.ipBlock.cidr
+  - source:
+      kind: ConfigMap
+      name: deploy-params
+      fieldPath: data.ALB_SOURCE_CIDR
+    targets:
+      - select:
+          kind: NetworkPolicy
+          name: web-ingress-from-alb
+        fieldPaths:
+          - spec.ingress.0.from.0.ipBlock.cidr

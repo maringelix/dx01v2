@@ -18,7 +18,10 @@ const manifests = parseAllDocuments(readFileSync(manifestsFile, 'utf8'))
   .map((doc) => doc.toJS())
   .filter(Boolean);
 const source = document.spec?.source;
-if (typeof source?.path !== 'string' || !/^deploy\/k8s\/overlays\/(aws|aws-https)$/.test(source.path)) {
+if (
+  typeof source?.path !== 'string' ||
+  !/^deploy\/k8s\/overlays\/(aws|aws-https|aws-full|aws-https-full)$/.test(source.path)
+) {
   fail(`unexpected source path: ${source?.path}`);
 }
 
@@ -58,6 +61,27 @@ for (const override of images) {
 
 const patches = source?.kustomize?.patches ?? [];
 if (patches.length === 0) fail('the Application has no cloud-specific Kustomize patches');
+const https = source.path.endsWith('aws-https') || source.path.endsWith('aws-https-full');
+const ingressHostPatch = patches.flatMap((entry) => {
+  if (entry.target?.kind !== 'Ingress' || entry.target?.name !== 'dx01v2') return [];
+  try {
+    return JSON.parse(entry.patch).filter((operation) => operation.path === '/spec/rules/0/host');
+  } catch {
+    return [];
+  }
+});
+if (https) {
+  if (
+    ingressHostPatch.length !== 1 ||
+    !/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$/.test(
+      ingressHostPatch[0]?.value ?? '',
+    )
+  ) {
+    fail('the aws-https Application must override the Ingress host with one valid DNS name from the tx01v2 contract');
+  }
+} else if (ingressHostPatch.length !== 0) {
+  fail('the HTTP-only AWS Application must not publish a public DNS host');
+}
 for (const entry of patches) {
   const { kind, name } = entry.target ?? {};
   const targets = manifests.filter((resource) => resource.kind === kind && resource.metadata?.name === name);

@@ -35,7 +35,7 @@ The lab family (v2):
 |---|---|---|
 | Lint, formatting and type checks (eslint, prettier, tsc for `api` and `web`) | `verified in CI` | `make static` (`eslint`, `prettier`, `typecheck:*`); CI job `static` |
 | Dockerfiles, workflows and scripts (hadolint, actionlint, shellcheck) | `verified in CI` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
-| Kubernetes manifests: kustomize render + kubeconform strict (local, aws, aws-https), contract and hardening assertions, trivy config | `verified in CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
+| Kubernetes manifests: kustomize render + kubeconform strict (local, aws, aws-https, aws-full, aws-https-full), contract and hardening assertions, trivy config | `verified in CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
 | Secret scan and repository policies (no real identifiers, pinned actions and images, v1 regressions) | `verified in CI` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
 | GitHub deploy identity uses the protected `lab` environment and the immutable owner/repository subject expected by tx01v2 | `verified in CI` | `policy-workflows`; coordinated tx01v2#14 OIDC tests |
 | API unit + integration tests against a real PostgreSQL 17 (coverage gate: lines >= 80 %, branches >= 70 %) | `verified in CI` | `make test` (`test:api`); CI job `test` |
@@ -43,7 +43,7 @@ The lab family (v2):
 | Images: build, numeric non-root user, no npm or shell in the API runtime, trivy HIGH/CRITICAL gate | `verified in CI` | `make build`; CI job `images` |
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
-| AWS deploy (verified GHCR release, digest promotion to ECR, EKS of tx01v2, GitOps, ExternalSecrets, ALB + WAF, traces to X-Ray, smoke test) | `not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| AWS deploy (`core`/`full`, verified GHCR release, signed digest promotion to ECR, EKS of tx01v2, GitOps, ALB + WAF, optional Route53/ACM HTTPS, ambient mesh canary/retries/circuit breaking, traces to X-Ray) | `implemented as code; not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
@@ -80,8 +80,8 @@ flowchart LR
 - Local (compose) and kind: one reverse proxy (web nginx) in front of the API (`TRUST_PROXY_HOPS=1`).
 - AWS: the ALB (with the WAF of tx01v2) routes `/api` to the API and `/` to the web; secrets come
   from Secrets Manager through External Secrets; the namespace, IAM and RDS belong to tx01v2. The
-  deploy workflow publishes the source revision to `gitops/aws` for Argo CD; the script also
-  supports direct push for clusters without Argo CD, while the Actions workflow always uses GitOps.
+  deploy workflow detects whether the Argo CD Application exists and selects GitOps or direct apply;
+  choose `auto`, `gitops` or `push` in the workflow when deploying a fork.
 - Design decisions, diagrams per environment and the v1 → v2 table: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
 
 ## Quick start (free, local)
@@ -148,7 +148,7 @@ All docs are in Brazilian Portuguese.
 | [FORK.md](FORK.md) | fork the lab: what GitHub does not copy, the local lab, your own cloud account |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagrams (local, kind, AWS), decisions, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, errors, curl examples |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v3 (app side; source of truth in tx01v2) |
+| [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v6 (app side; source of truth in tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | local development, compose, kind e2e, AWS deploy |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | rules, enforcement, exceptions, limits |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, strict mode, troubleshooting |

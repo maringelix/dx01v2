@@ -45,8 +45,15 @@ function image(value, key) {
 }
 
 const [cloud, overlay, actualFile, exampleFile] = process.argv.slice(2);
-if (!['aws'].includes(cloud) || !['aws', 'aws-https'].includes(overlay) || !actualFile || !exampleFile) {
-  fail('usage: render-gitops-application.mjs aws <aws|aws-https> <actual params.env> <params.example.env>');
+if (
+  !['aws'].includes(cloud) ||
+  !['aws', 'aws-https', 'aws-full', 'aws-https-full'].includes(overlay) ||
+  !actualFile ||
+  !exampleFile
+) {
+  fail(
+    'usage: render-gitops-application.mjs aws <aws|aws-https|aws-full|aws-https-full> <actual params.env> <params.example.env>',
+  );
 }
 
 const actual = readEnv(actualFile);
@@ -72,14 +79,15 @@ addPatch(
   '/metadata/annotations/alb.ingress.kubernetes.io~1wafv2-acl-arn',
   required(actual, 'WAF_ACL_ARN'),
 );
-for (const [name, cidrPath] of [
-  ['web-ingress-from-alb', '/spec/ingress/0/from/0/ipBlock/cidr'],
-  ['api-ingress-from-alb', '/spec/ingress/0/from/0/ipBlock/cidr'],
-  ['api-egress-to-rds', '/spec/egress/0/to/0/ipBlock/cidr'],
-]) {
-  addPatch('NetworkPolicy', name, cidrPath, required(actual, 'VPC_CIDR'));
-}
-if (overlay === 'aws-https') {
+addPatch(
+  'NetworkPolicy',
+  'web-ingress-from-alb',
+  '/spec/ingress/0/from/0/ipBlock/cidr',
+  required(actual, 'ALB_SOURCE_CIDR'),
+);
+addPatch('NetworkPolicy', 'api-egress-to-rds', '/spec/egress/0/to/0/ipBlock/cidr', required(actual, 'VPC_CIDR'));
+if (overlay.startsWith('aws-https')) {
+  addPatch('Ingress', 'dx01v2', '/spec/rules/0/host', required(actual, 'APP_DOMAIN_NAME'));
   addPatch(
     'Ingress',
     'dx01v2',

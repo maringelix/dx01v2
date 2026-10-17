@@ -1,5 +1,5 @@
 # Same as overlays/aws plus the HTTPS listener; chosen by scripts/deploy-aws.sh when the repository
-# variable ALB_CERTIFICATE_ARN (an ACM certificate in the lab region) is set.
+# DNS and ACM are enabled in the tx01v2 SSM contract.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 namespace: dx01v2

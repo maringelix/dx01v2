@@ -11,13 +11,12 @@
 #   RELEASE_RUN_ID       successful publish-images Actions run id for that bundle
 #   GH_TOKEN             token with packages:read, attestations:read, and actions:read
 #   GIT_SHA              optional; if set, must equal the release manifest source commit
-#   DEPLOY_MODE          gitops (default: commit to gitops/aws and wait for Argo CD) or push
+#   DEPLOY_MODE          auto (default: use GitOps when the Argo CD Application exists, otherwise
+#                        apply directly); or force gitops/push
+#   PLATFORM_PROFILE     core|full; must match the profile installed by tx01v2/platform.yml
 #                        (apply the cloud overlay directly; use only when Argo CD is not managing it)
 #   GITHUB_TOKEN         optional in a laptop session; Actions provides it for the GitOps branch push
 #   ARGO_SYNC_TIMEOUT    seconds to wait for the GitOps Application (default 600)
-#   ALB_CERTIFICATE_ARN  optional ACM certificate of the region: selects overlays/aws-https
-#   SMOKE_BASE_URL       smoke test URL (default http://<ALB hostname>); required with HTTPS:
-#                        https://<a DNS name of the certificate that points at the ALB>
 #   SMOKE_WAIT_SECONDS   how long the smoke test waits for the ALB and its DNS name (default 900)
 # Steps: verify signed release -> SSM contract -> promote verified digests from GHCR to ECR
 # (no build; immutable source-SHA tags) -> kubeconfig -> ConfigMap rds-ca -> configure Argo CD and publish gitops/aws
@@ -29,6 +28,8 @@ set -euo pipefail
 source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 # shellcheck source=scripts/lib/k8s.sh
 source "$REPO_ROOT/scripts/lib/k8s.sh"
+# shellcheck source=scripts/lib/deploy-mode.sh
+source "$REPO_ROOT/scripts/lib/deploy-mode.sh"
 export PATH="$REPO_ROOT/.tools/bin:$PATH"
 
 NAMESPACE=dx01v2
@@ -39,12 +40,17 @@ SSM_NAMES=(
   "$SSM_PREFIX/cluster-name"
   "$SSM_PREFIX/vpc-id"
   "$SSM_PREFIX/vpc-cidr"
+  "$SSM_PREFIX/alb/source-cidr"
   "$SSM_PREFIX/ecr/api-url"
   "$SSM_PREFIX/ecr/web-url"
   "$SSM_PREFIX/waf/acl-arn"
   "$SSM_PREFIX/db/secret-name"
   "$SSM_PREFIX/app/admin-token-secret-name"
   "$SSM_PREFIX/eso/cluster-secret-store"
+  "$SSM_PREFIX/dns/enabled"
+  "$SSM_PREFIX/dns/domain-name"
+  "$SSM_PREFIX/dns/zone-id"
+  "$SSM_PREFIX/dns/acm-certificate-arn"
 )
 # Values hard-coded in deploy/k8s/components/aws: the copy published by tx01v2 must agree.
 CONTRACT_CLUSTER=tx01v2-lab
@@ -66,11 +72,16 @@ declare -A PARAM=()
 WORK_DIR=""
 GROUP_OPEN=0
 OVERLAY=aws
+DNS_ENABLED=false
+APP_DOMAIN_NAME=disabled
+ALB_CERTIFICATE_ARN=""
 API_IMAGE=""
 WEB_IMAGE=""
 ALB_HOSTNAME=""
 BASE=""
-DEPLOY_MODE="${DEPLOY_MODE:-gitops}"
+DEPLOY_MODE="${DEPLOY_MODE:-auto}"
+PLATFORM_PROFILE="${PLATFORM_PROFILE:-core}"
+PROMOTE_ONLY=false
 ARGO_SYNC_TIMEOUT="${ARGO_SYNC_TIMEOUT:-600}"
 GITOPS_REV=""
 
@@ -148,24 +159,22 @@ preflight() {
   GIT_SHA="$release_sha"
   [[ -n "${AWS_REGION:-}" ]] || die "AWS_REGION is required (the region of the tx01v2 lab)"
   [[ "$AWS_REGION" =~ ^[a-z]{2}(-[a-z]+)+-[0-9]+$ ]] || die "AWS_REGION does not look like a region: $AWS_REGION"
-  [[ "$DEPLOY_MODE" == gitops || "$DEPLOY_MODE" == push ]] || die "DEPLOY_MODE must be gitops or push"
+  [[ "$DEPLOY_MODE" == auto || "$DEPLOY_MODE" == gitops || "$DEPLOY_MODE" == push ]] ||
+    die "DEPLOY_MODE must be auto, gitops or push"
+  [[ "$PLATFORM_PROFILE" == core || "$PLATFORM_PROFILE" == full ]] ||
+    die "PLATFORM_PROFILE must be core or full"
   if [[ ! "$ARGO_SYNC_TIMEOUT" =~ ^[1-9][0-9]*$ ]]; then
     die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
   fi
   if ((ARGO_SYNC_TIMEOUT < 5)); then
     die "ARGO_SYNC_TIMEOUT must be an integer of at least 5 seconds"
   fi
-  if [[ -n "${ALB_CERTIFICATE_ARN:-}" ]]; then
-    OVERLAY=aws-https
-    [[ "${SMOKE_BASE_URL:-}" == https://* ]] ||
-      die "with ALB_CERTIFICATE_ARN, set SMOKE_BASE_URL=https://<a DNS name of the certificate that points at the ALB>"
-  fi
   aws sts get-caller-identity --query Arn --output text >/dev/null ||
     die "no usable AWS credentials (role dx01v2-gha-deploy, or a principal listed in app_deployer_principal_arns of tx01v2)"
 }
 
 read_contract() {
-  local out name value n
+  local out name value n zone_id
   out="$(aws ssm get-parameters --names "${SSM_NAMES[@]}" --query 'Parameters[].[Name,Value]' --output text)" ||
     die "cannot read the SSM parameters $SSM_PREFIX/* (was tx01v2 terraform/envs/lab applied in $AWS_REGION?)"
   while IFS=$'\t' read -r name value; do
@@ -181,6 +190,33 @@ read_contract() {
   expect_param db/secret-name "$CONTRACT_DB_SECRET"
   expect_param app/admin-token-secret-name "$CONTRACT_ADMIN_TOKEN_SECRET"
   expect_param eso/cluster-secret-store "$CONTRACT_SECRET_STORE"
+  DNS_ENABLED="$(param dns/enabled)"
+  APP_DOMAIN_NAME="$(param dns/domain-name)"
+  zone_id="$(param dns/zone-id)"
+  ALB_CERTIFICATE_ARN="$(param dns/acm-certificate-arn)"
+  case "$DNS_ENABLED" in
+    false)
+      [[ "$APP_DOMAIN_NAME" == disabled && "$zone_id" == disabled && "$ALB_CERTIFICATE_ARN" == disabled ]] ||
+        die "DNS contract is inconsistent: disabled must use disabled sentinels for domain, zone and certificate"
+      APP_DOMAIN_NAME=disabled
+      ALB_CERTIFICATE_ARN=""
+      ;;
+    true)
+      [[ "$APP_DOMAIN_NAME" =~ ^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+$ ]] ||
+        die "DNS contract has an invalid app domain name"
+      [[ "$zone_id" =~ ^Z[A-Z0-9]+$ ]] || die "DNS contract has an invalid public Route53 hosted zone ID"
+      [[ "$ALB_CERTIFICATE_ARN" =~ ^arn:aws[a-z-]*:acm:${AWS_REGION}:[0-9]{12}:certificate/[0-9a-f-]{36}$ ]] ||
+        die "DNS contract has no validated ACM certificate in $AWS_REGION"
+      ;;
+    *) die "DNS contract dns/enabled must be true or false" ;;
+  esac
+  if [[ "$PLATFORM_PROFILE" == full ]]; then
+    if [[ "$DNS_ENABLED" == true ]]; then OVERLAY=aws-https-full; else OVERLAY=aws-full; fi
+  elif [[ "$DNS_ENABLED" == true ]]; then
+    OVERLAY=aws-https
+  else
+    OVERLAY=aws
+  fi
   [[ "$(param ecr/api-url)" =~ ${ECR_URL_PATTERN}api$ ]] || die "SSM $SSM_PREFIX/ecr/api-url is not the URL of the dx01v2/api repository"
   [[ "$(param ecr/web-url)" =~ ${ECR_URL_PATTERN}web$ ]] || die "SSM $SSM_PREFIX/ecr/web-url is not the URL of the dx01v2/web repository"
   API_IMAGE="$(param ecr/api-url):$GIT_SHA"
@@ -222,12 +258,40 @@ publish_images() {
   log "promoted the signed release to ECR by immutable digest; no image was rebuilt"
 }
 
+write_github_outputs() {
+  [[ -n "${GITHUB_OUTPUT:-}" ]] || return 0
+  [[ "$API_IMAGE" == *@sha256:* && "$WEB_IMAGE" == *@sha256:* ]] || die "refusing to publish invalid ECR image outputs"
+  {
+    printf 'api_name=%s\n' "${API_IMAGE%@*}"
+    printf 'api_digest=%s\n' "${API_IMAGE##*@}"
+    printf 'web_name=%s\n' "${WEB_IMAGE%@*}"
+    printf 'web_digest=%s\n' "${WEB_IMAGE##*@}"
+  } >>"$GITHUB_OUTPUT"
+}
+
 connect_cluster() {
   export KUBECONFIG="$WORK_DIR/kubeconfig"
   aws eks update-kubeconfig --name "$(param cluster-name)" --region "$AWS_REGION" --kubeconfig "$KUBECONFIG" \
     --alias dx01v2-lab >/dev/null
   [[ "$(kubectl auth can-i create deployments.apps -n "$NAMESPACE")" == yes ]] ||
     die "this principal cannot deploy to namespace $NAMESPACE: it needs an EKS access entry in the group dx01v2-deployers (tx01v2 app_deployer_principal_arns) and the tx01v2 platform layer (Role dx01v2-deployer)"
+  if [[ "$PLATFORM_PROFILE" == full ]]; then
+    [[ "$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels.istio\.io/dataplane-mode}')" == ambient ]] ||
+      die "PLATFORM_PROFILE=full needs tx01v2/platform.yml profile full (namespace $NAMESPACE is not in ambient mode)"
+    [[ "$(kubectl get namespace "$NAMESPACE" -o jsonpath='{.metadata.labels.istio\.io/use-waypoint}')" == dx01v2-waypoint ]] ||
+      die "PLATFORM_PROFILE=full needs the dx01v2-waypoint waypoint installed by tx01v2"
+    [[ "$(kubectl -n "$NAMESPACE" get gateway dx01v2-waypoint -o jsonpath='{.status.conditions[?(@.type==\"Programmed\")].status}')" == True ]] ||
+      die "the dx01v2-waypoint Gateway is not Programmed"
+  fi
+  if [[ "$DEPLOY_MODE" == auto ]]; then
+    DEPLOY_MODE="$(resolve_aws_deploy_mode "$DEPLOY_MODE")" ||
+      die "cannot select a safe deploy mode; resolve Argo CD access and retry"
+    if [[ "$DEPLOY_MODE" == gitops ]]; then
+      log "Argo CD Application dx01v2 exists; using GitOps"
+    else
+      log "Argo CD Application dx01v2 is absent; applying the cloud overlay directly"
+    fi
+  fi
   if [[ "$DEPLOY_MODE" == gitops ]]; then
     [[ "$(kubectl auth can-i patch applications.argoproj.io/dx01v2 -n argocd)" == yes ]] ||
       die "this principal cannot patch the Argo CD Application dx01v2 in argocd (tx01v2 full platform Role)"
@@ -247,10 +311,13 @@ write_params() {
   local params="$WORK_DIR/params.env"
   {
     echo "API_IMAGE=$API_IMAGE"
+    echo "MESH_IMAGE=$API_IMAGE"
     echo "WEB_IMAGE=$WEB_IMAGE"
     echo "WAF_ACL_ARN=$(param waf/acl-arn)"
     echo "VPC_CIDR=$(param vpc-cidr)"
-    echo "ALB_CERTIFICATE_ARN=${ALB_CERTIFICATE_ARN:-}"
+    echo "ALB_SOURCE_CIDR=$(param alb/source-cidr)"
+    echo "ALB_CERTIFICATE_ARN=$ALB_CERTIFICATE_ARN"
+    echo "APP_DOMAIN_NAME=$APP_DOMAIN_NAME"
   } >"$params"
 }
 
@@ -367,7 +434,11 @@ wait_for_ingress() {
 
 smoke() {
   local token status=0 smoke_host
-  BASE="${SMOKE_BASE_URL:-http://$ALB_HOSTNAME}"
+  if [[ "$DNS_ENABLED" == true ]]; then
+    BASE="https://$APP_DOMAIN_NAME"
+  else
+    BASE="http://$ALB_HOSTNAME"
+  fi
   if in_actions; then
     echo "::add-mask::$BASE"
     echo "::add-mask::$ALB_HOSTNAME"
@@ -388,7 +459,7 @@ smoke() {
     fi
   else
     # The admin token is a credential: it never goes over plain HTTP to the internet.
-    log "the entry point is plain HTTP: the admin token is not read, and the smoke test skips the DELETE that needs it (ALB_CERTIFICATE_ARN and SMOKE_BASE_URL give HTTPS)"
+    log "the entry point is plain HTTP: the admin token is not read, and the smoke test skips the DELETE that needs it (enable Route53 and ACM in tx01v2 for HTTPS)"
   fi
   # SMOKE_BEHIND_WAF=1: the WAF of tx01v2 answers oversized bodies with 403 before the API does.
   BASE_URL="$BASE" ADMIN_TOKEN="$token" SMOKE_WAIT_SECONDS="${SMOKE_WAIT_SECONDS:-900}" SMOKE_BEHIND_WAF=1 \
@@ -397,7 +468,11 @@ smoke() {
 }
 
 main() {
-  (($# == 0)) || die "usage: $0 (configuration through environment variables, see the header)"
+  if (($# == 1)) && [[ "$1" == --promote-only ]]; then
+    PROMOTE_ONLY=true
+  elif (($# != 0)); then
+    die "usage: $0 [--promote-only] (configuration through environment variables, see the header)"
+  fi
   preflight
   WORK_DIR="$(mktemp -d)"
   trap cleanup EXIT
@@ -405,6 +480,11 @@ main() {
   read_contract
   section "signed release $GIT_SHA: promote GHCR digests to ECR"
   publish_images
+  write_github_outputs
+  if [[ "$PROMOTE_ONLY" == true ]]; then
+    log "promotion complete; the workflow will attest the ECR digests before deploying them"
+    return 0
+  fi
   section "cluster $(param cluster-name): kubeconfig and RBAC"
   connect_cluster
   section "ConfigMap rds-ca ($AWS_REGION bundle)"

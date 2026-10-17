@@ -9,15 +9,43 @@ spec:
   mtls:
     mode: STRICT
 ---
-# api: the Gateway and web on 3000, Prometheus on the metrics port 9464. Nothing else.
+# The waypoint checks original client identities and HTTP traffic. ztunnel permits only the waypoint
+# to reach API/web application ports. Prometheus scrapes pod IPs, so its authenticated identity
+# gets a separate metrics-only L4 rule; this does not grant access to the application port.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: api-require-waypoint
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: api
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/dx01v2/sa/dx01v2-waypoint
+      to:
+        - operation:
+            ports: ['3000', '9464']
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/monitoring/sa/kube-prometheus-stack-prometheus
+      to:
+        - operation:
+            ports: ['9464']
+---
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
   name: api
 spec:
-  selector:
-    matchLabels:
-      app.kubernetes.io/name: api
+  targetRefs:
+    - group: ''
+      kind: Service
+      name: api
   action: ALLOW
   rules:
     - from:
@@ -35,12 +63,19 @@ spec:
       to:
         - operation:
             ports: ['9464']
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/monitoring/sa/opentelemetry-collector
+      to:
+        - operation:
+            ports: ['3000']
+            paths: ['/readyz']
 ---
-# web: only the Gateway.
 apiVersion: security.istio.io/v1
 kind: AuthorizationPolicy
 metadata:
-  name: web
+  name: web-require-waypoint
 spec:
   selector:
     matchLabels:
@@ -50,7 +85,36 @@ spec:
     - from:
         - source:
             principals:
+              - cluster.local/ns/dx01v2/sa/dx01v2-waypoint
+      to:
+        - operation:
+            ports: ['8080']
+---
+# web: Gateway traffic plus the Collector's synthetic health check through the waypoint.
+apiVersion: security.istio.io/v1
+kind: AuthorizationPolicy
+metadata:
+  name: web
+spec:
+  targetRefs:
+    - group: ''
+      kind: Service
+      name: web
+  action: ALLOW
+  rules:
+    - from:
+        - source:
+            principals:
               - cluster.local/ns/dx01v2/sa/dx01v2-istio
       to:
         - operation:
             ports: ['8080']
+    - from:
+        - source:
+            principals:
+              - cluster.local/ns/monitoring/sa/opentelemetry-collector
+      to:
+        - operation:
+            ports: ['8080']
+            methods: [GET]
+            paths: ['/healthz']

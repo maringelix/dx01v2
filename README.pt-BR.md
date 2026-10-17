@@ -35,7 +35,7 @@ A família do lab (v2):
 |---|---|---|
 | Lint, formatação e checagem de tipos (eslint, prettier, tsc para `api` e `web`) | `verificado no CI` | `make static` (`eslint`, `prettier`, `typecheck:*`); job `static` do CI |
 | Dockerfiles, workflows e scripts (hadolint, actionlint, shellcheck) | `verificado no CI` | `make static` (`hadolint`, `actionlint`, `shellcheck`) |
-| Manifests Kubernetes: render do kustomize + kubeconform estrito (local, aws, aws-https), asserções de contrato e de hardening, trivy config | `verificado no CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
+| Manifests Kubernetes: render do kustomize + kubeconform estrito (local, aws, aws-https, aws-full, aws-https-full), asserções de contrato e de hardening, trivy config | `verificado no CI` | `make static` (`kubeconform`, `contract-app`, `trivy-config`) |
 | Scan de segredos e políticas do repositório (sem identificadores reais, actions e imagens fixadas, regressões do v1) | `verificado no CI` | `make static` (`gitleaks`, `policy-*`, `repo-structure`, `version-consistency`) |
 | Identidade de deploy do GitHub usa o environment protegido `lab` e o subject imutável de dono/repositório esperado pelo tx01v2 | `verificado no CI` | `policy-workflows`; testes OIDC do tx01v2#14 coordenado |
 | Testes unitários + de integração da API contra um PostgreSQL 17 real (gate de cobertura: linhas >= 80 %, branches >= 70 %) | `verificado no CI` | `make test` (`test:api`); job `test` do CI |
@@ -43,7 +43,7 @@ A família do lab (v2):
 | Imagens: build, usuário numérico não root, sem npm nem shell no runtime da API, gate do trivy HIGH/CRITICAL | `verificado no CI` | `make build`; job `images` do CI |
 | Stack do compose (PostgreSQL → migrate → api → web em 127.0.0.1) + smoke test | `verificado localmente` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, fora do CI) |
 | Ponta a ponta no kind: Pod Security `restricted`, smoke test pelo nginx, enforcement de NetworkPolicy | `verificado no CI` | `make e2e` (`scripts/e2e-kind.sh`); job `e2e` do CI |
-| Deploy na AWS (release GHCR verificada, promoção por digest para ECR, EKS do tx01v2, GitOps, ExternalSecrets, ALB + WAF, traces no X-Ray, smoke test) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
+| Deploy na AWS (`core`/`full`, release GHCR verificada, promoção assinada por digest para ECR, EKS do tx01v2, GitOps, ALB + WAF, HTTPS opcional com Route53/ACM, canário/retries/circuit breaking no mesh ambient, traces no X-Ray) | `não executado em nuvem (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
 | Configurações do repositório como código (ruleset, environment `lab`) | `verificado localmente` | `scripts/repo-guardrails.sh` aplicado; conferido com `gh api` em 2026-10-14 (`docs/PUBLICACAO.md`) |
 | **O app na plataforma local completa do tx01v2** (kind + ECR, RDS, S3, load balancer e servidor git emulados): imagens no registry do lab, GitOps com Argo CD (Synced, Healthy, self-heal) | `verificado no CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS pelo load balancer emulado e um Gateway do Istio (cert-manager, CA do lab), smoke test de fora do mesh; TLS `verify-full` no banco | `verificado no CI` | `make e2e-platform` (sonda `smoke`) |
@@ -146,7 +146,7 @@ e Argo CD → smoke test pelo ALB → destroy do tx01v2 + checagem de sobras →
 | [FORK.md](FORK.md) | fork do lab (em inglês): o que o GitHub não copia, o lab local, a sua conta de nuvem |
 | [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagramas (local, kind, AWS), decisões, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, erros, exemplos em curl |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v3 (lado do app; fonte da verdade no tx01v2) |
+| [docs/CONTRATO.md](docs/CONTRATO.md) | contrato tx01v2 ⇄ dx01v2 v6 (lado do app; fonte da verdade no tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | desenvolvimento local, compose, e2e no kind, deploy na AWS |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | regras, aplicação, exceções, limites |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, modo estrito, problemas comuns |

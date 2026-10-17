@@ -1,6 +1,6 @@
-# AWS edges on top of the base policies (enforced by the VPC CNI network policy agent):
-# the ALB (target-type ip) reaches the pods from inside the VPC, the API reaches RDS in the VPC.
-# The CIDR comes from SSM (/tx01v2/lab/vpc-cidr) through deploy-params.
+# AWS edges on top of the base policies (enforced by the VPC CNI network policy agent): the ALB
+# reaches only the web edge from its public subnet range, while API reaches private RDS in the VPC.
+# The full profile additionally routes east-west traffic through the Istio waypoint.
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -13,7 +13,7 @@ spec:
   ingress:
     - from:
         - ipBlock:
-            cidr: 192.0.2.0/24
+            cidr: 10.0.0.0/23
       ports:
         - protocol: TCP
           port: 8080
@@ -21,7 +21,24 @@ spec:
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
-  name: api-ingress-from-alb
+  name: web-health-probe-from-node
+spec:
+  podSelector:
+    matchLabels:
+      app.kubernetes.io/name: web
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - ipBlock:
+            cidr: 169.254.7.127/32
+      ports:
+        - protocol: TCP
+          port: 8080
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-health-probe-from-node
 spec:
   podSelector:
     matchLabels:
@@ -30,7 +47,7 @@ spec:
   ingress:
     - from:
         - ipBlock:
-            cidr: 192.0.2.0/24
+            cidr: 169.254.7.127/32
       ports:
         - protocol: TCP
           port: 3000
@@ -52,7 +69,7 @@ spec:
         - protocol: TCP
           port: 5432
 ---
-# Traces (OTLP/HTTP) to the OpenTelemetry Collector of the platform layer (contract v2).
+# Traces (OTLP/HTTP) and ambient HBONE to the OpenTelemetry Collector of the platform layer (contract v2).
 apiVersion: networking.k8s.io/v1
 kind: NetworkPolicy
 metadata:
@@ -73,3 +90,5 @@ spec:
       ports:
         - protocol: TCP
           port: 4318
+        - protocol: TCP
+          port: 15008

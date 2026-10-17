@@ -6,13 +6,14 @@ K8S_DIR="$REPO_ROOT/deploy/k8s"
 K8S_PARAMS_EXAMPLE="$K8S_DIR/components/aws/params.example.env"
 K8S_LOCAL_PARAMS_EXAMPLE="$K8S_DIR/components/local-platform/params.example.env"
 # shellcheck disable=SC2034 # used by the scripts that source this file
-K8S_OVERLAYS=(local aws aws-https local-platform)
+K8S_OVERLAYS=(local aws aws-https aws-full aws-https-full local-platform)
 
 # Formats accepted for every deploy parameter of the local-platform overlay (values come from the
 # ConfigMap lab-system/lab-contract of the tx01v2 local lab).
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_LOCAL_PARAM_PATTERN=(
   [API_IMAGE]='^registry\.tx01v2\.local/dx01v2/api:[0-9a-f]{40}$'
+  [MESH_IMAGE]='^registry\.tx01v2\.local/dx01v2/api:[0-9a-f]{40}$'
   [WEB_IMAGE]='^registry\.tx01v2\.local/dx01v2/web:[0-9a-f]{40}$'
   [NETWORK_CIDR]='^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.0/24$'
   [DB_ENDPOINT_CIDR]='^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/32$'
@@ -22,10 +23,13 @@ declare -A K8S_LOCAL_PARAM_PATTERN=(
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_PARAM_PATTERN=(
   [API_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
+  [MESH_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [WEB_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/web(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [WAF_ACL_ARN]='^arn:aws[a-z-]*:wafv2:[a-z0-9-]+:[0-9]{12}:regional/webacl/[A-Za-z0-9_-]+/[0-9a-f-]{36}$'
   [VPC_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
+  [ALB_SOURCE_CIDR]='^([0-9]{1,3}\.){3}[0-9]{1,3}/([89]|1[0-9]|2[0-8])$'
   [ALB_CERTIFICATE_ARN]='^(arn:aws[a-z-]*:acm:[a-z0-9-]+:[0-9]{12}:certificate/[0-9a-f-]{36})?$'
+  [APP_DOMAIN_NAME]='^(disabled|[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?(\.[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?)+)$'
 )
 
 # k8s_validate_params FILE [PATTERNS] -> fails unless FILE has exactly the known keys with valid
@@ -59,6 +63,19 @@ k8s_validate_params() {
       rc=1
     }
   done
+  if [[ -n "${seen[APP_DOMAIN_NAME]:-}" && -n "${seen[ALB_CERTIFICATE_ARN]:-}" ]]; then
+    if [[ "$(sed -n 's/^APP_DOMAIN_NAME=//p' "$file")" == disabled ]]; then
+      [[ -z "$(sed -n 's/^ALB_CERTIFICATE_ARN=//p' "$file")" ]] || {
+        log "params: ALB_CERTIFICATE_ARN must be empty when APP_DOMAIN_NAME is disabled"
+        rc=1
+      }
+    else
+      [[ -n "$(sed -n 's/^ALB_CERTIFICATE_ARN=//p' "$file")" ]] || {
+        log "params: ALB_CERTIFICATE_ARN is required when APP_DOMAIN_NAME is enabled"
+        rc=1
+      }
+    fi
+  fi
   return "$rc"
 }
 

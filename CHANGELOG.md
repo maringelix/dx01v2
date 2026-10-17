@@ -5,7 +5,32 @@ All notable changes to this project are documented here. The format follows
 [Conventional Commits](https://www.conventionalcommits.org/).
 
 ## [Unreleased]
+### Fixed
+
+- Keep pod-IP metrics scraping reachable only to the authenticated Prometheus identity on port
+  9464, while API traffic still requires the waypoint. The Collector's synthetic web probe is
+  limited to GET /healthz. Manifest checks enforce both narrow exceptions.
+
+- Permit HBONE on the generated Istio waypoint under namespace default-deny, with egress limited
+  to the app, mesh demo, control plane and telemetry. AuthorizationPolicy still enforces client
+  identity and HTTP rules; the waypoint Service remains ClusterIP.
+
+- The platform rollback exercise pins its mesh demo to the tested R8 API image while it deploys the
+  older application image. This keeps the mesh pods healthy when the earlier release predates the
+  mesh demo, and still exercises an actual previous app artifact. The workflow source check also
+  matches its main-branch expression literally without a ShellCheck false positive.
+
 ### Added
+
+- Complete the dx side of R8.1–R8.4 with the version 6 AWS contract, separate `core|full` deploy
+  overlays, and an isolated mesh canary exercise. The workflow attests promoted ECR digests with its
+  keyless GitHub identity; tx01v2's Kyverno policy checks that exact signer before admitting app
+  Pods. The application, mesh probes, and contract render are covered by CI; AWS runtime remains
+  `not run in the cloud (v2)`.
+
+- R8.1 AWS DNS/TLS integration: the deployment consumes the v5 tx01v2 SSM contract, selects HTTPS
+  only when Route53 and ACM are enabled, routes the configured hostname, and derives its smoke URL
+  from that contract. No manually supplied certificate ARN or DNS URL is needed.
 
 - R7 DevSecOps gates: CodeQL `security-extended` with a fail-closed SARIF severity threshold, a real
   SonarQube Community Build Quality Gate with LCOV and a negative coverage fixture, Trivy dependency
