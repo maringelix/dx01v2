@@ -326,6 +326,12 @@ spec:
               value: "$mode"
             - name: MESH_PROBE_TARGET
               value: http://mesh-demo:3000
+          # Gatekeeper requires readiness on every container, including this one-shot client.
+          readinessProbe:
+            exec:
+              command: ["/nodejs/bin/node", "-e", "process.exit(0)"]
+            periodSeconds: 5
+            timeoutSeconds: 5
           securityContext:
             allowPrivilegeEscalation: false
             readOnlyRootFilesystem: true
@@ -335,9 +341,9 @@ spec:
           resources:
             requests:
               cpu: 25m
-              memory: 48Mi
+              memory: 64Mi
             limits:
-              memory: 96Mi
+              memory: 128Mi
 EOF
   if ! kubectl -n "$NAMESPACE" wait --for=condition=complete "job/$job" --timeout=150s; then
     if ! kubectl -n "$NAMESPACE" logs "job/$job"; then
