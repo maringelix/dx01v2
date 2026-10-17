@@ -56,3 +56,19 @@ Não copie o arquivo `.env` local para cloud. Segredos regionais ficam no Secret
 Manager e workload identities da região. A promoção publica os digests já
 assinados no registry da região recuperada; não deve reconstruir o código.
 
+## Deploy e dados da região de recuperação
+
+O contrato v7 seleciona EKS, registry, rede, WAF, certificado ACM e endpoint RDS
+da região escolhida. `target=secondary` lê `/tx01v2/lab-dr/`, publica
+`gitops/aws-dr` e usa `LAB_DR_REGION` (padrão us-west-2). Configure primeiro
+o perfil DR e a plataforma do TX. O registry recebe os digests aprovados do release.
+
+Secrets Manager replica usuário, senha e token **vigentes** com o mesmo nome
+em outra região. O template do ESO altera somente DB_HOST para `db/endpoint`.
+O deploy não lê valores de Secrets Manager. As 16 chaves SSM são lidas em lotes
+de até dez, limite da API, e ausência/falha de qualquer lote bloqueia o deploy.
+
+Após fencing e promoção autorizada, o smoke usa o IP do ALB secundário com o
+hostname público e TLS verificado antes de qualquer mudança de DNS. Exige a
+revisão publicada e uma escrita/leitura. Só depois ative o ExternalDNS secundário
+no workflow TX (`activate_dns=true`); ele nasce com zero réplicas.

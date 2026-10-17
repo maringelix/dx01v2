@@ -594,7 +594,7 @@ check_contract_app() {
     local="$dir/local.yaml" aws="$dir/aws.yaml" aws-https="$dir/aws-https.yaml" \
     aws-full="$dir/aws-full.yaml" aws-https-full="$dir/aws-https-full.yaml" \
     local-platform="$dir/local-platform.yaml" || rc=1
-  for name in region cluster-name vpc-id vpc-cidr alb/source-cidr ecr/api-url ecr/web-url waf/acl-arn db/secret-name \
+  for name in region cluster-name vpc-id vpc-cidr alb/source-cidr ecr/api-url ecr/web-url waf/acl-arn db/endpoint db/secret-name \
     app/admin-token-secret-name eso/cluster-secret-store dns/enabled dns/domain-name dns/zone-id \
     dns/acm-certificate-arn; do
     grep -qF "\"\$SSM_PREFIX/$name\"" scripts/deploy-aws.sh || {
@@ -950,6 +950,9 @@ register_checks() {
   register static promotion-statements check_promotion_statements
   register static trivyignore-policy check_trivyignore_policy
   register static npm-ci check_npm_ci
+  register static region-target 'bash scripts/tests/region-target.sh'
+  register static regional-smoke 'bash scripts/tests/regional-smoke.sh'
+  register static ssm-batches 'bash scripts/tests/ssm.sh'
   register static eslint check_eslint
   register static prettier check_prettier
   register static typecheck:api "check_typecheck api"

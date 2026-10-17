@@ -6,6 +6,9 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- R9: consume contract v7 in either region, preserve current replicated credentials while selecting
+  the regional database endpoint, isolate GitOps branches and verify recovery before DNS cutover.
+
 ### Added
 
 - R9 independent Docker A/B recovery gate: verified backup/configuration, PostgreSQL TLS,

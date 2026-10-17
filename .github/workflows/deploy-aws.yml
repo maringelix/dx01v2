@@ -6,6 +6,11 @@ name: deploy-aws
 on:
   workflow_dispatch:
     inputs:
+      target:
+        description: Lab runtime after approved fencing/promotion
+        type: choice
+        options: [primary, secondary]
+        default: primary
       release_run_id:
         description: Successful publish-images workflow run id for the release to deploy
         required: true
@@ -98,7 +103,8 @@ jobs:
       id-token: write
       packages: read
     env:
-      AWS_REGION: ${{ vars.AWS_REGION }}
+      LAB_TARGET: ${{ inputs.target }}
+      AWS_REGION: ${{ inputs.target == 'secondary' && (vars.LAB_DR_REGION || 'us-west-2') || vars.AWS_REGION }}
       DEPLOY_MODE: ${{ inputs.deploy_mode }}
       PLATFORM_PROFILE: ${{ inputs.platform_profile }}
       GH_TOKEN: ${{ github.token }}
@@ -145,7 +151,7 @@ jobs:
         with:
           role-to-assume: ${{ vars.AWS_DEPLOY_ROLE_ARN }}
           role-session-name: dx01v2-deploy-${{ github.run_id }}
-          aws-region: ${{ vars.AWS_REGION }}
+          aws-region: ${{ env.AWS_REGION }}
           mask-aws-account-id: true
 
       - name: Install pinned kubectl

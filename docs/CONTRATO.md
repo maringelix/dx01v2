@@ -1,4 +1,11 @@
-# Contrato tx01v2 <-> dx01v2 — versão 6 (2026-10-16)
+# Contrato tx01v2 <-> dx01v2 — versão 7 (2026-10-17)
+
+R9 acrescenta `db/endpoint` e o contrato secundário `/tx01v2/lab-dr/` na região
+DR. O workflow seleciona o destino, seu EKS/ECR/ACM/WAF e `gitops/aws-dr`.
+Secrets Manager replica os **valores atuais**, mantendo os nomes dos segredos;
+a região muda. O template do ExternalSecret sobrescreve apenas DB_HOST com o
+endpoint do contrato, preservando usuário/senha/porta/base replicados. Isso evita
+usar o hostname primário que ainda existe no JSON original.
 
 Versão 5 recebe do tx01v2 a configuração opcional de Route53/ACM: o deploy lê quatro valores DNS
 adicionais no SSM, escolhe `aws-https` pelo contrato e define o hostname do Ingress sem variáveis
@@ -99,6 +106,7 @@ no cluster; `ssm:GetParameter`, `ssm:GetParameters`, `ssm:GetParametersByPath` e
 | `ecr/web-url` | URL do repositório `dx01v2/web` | imagem do web (`WEB_IMAGE`) |
 | `waf/acl-arn` | ARN do web ACL WAFv2 REGIONAL | anotação `alb.ingress.kubernetes.io/wafv2-acl-arn` (`WAF_ACL_ARN`) |
 | `db/secret-name` | `tx01v2-lab/db/app` | conferido contra o ExternalSecret `db-credentials` |
+| `db/endpoint` | FQDN privado do RDS da região selecionada | template DB_HOST do Secret, TLS verify-full |
 | `app/admin-token-secret-name` | `tx01v2-lab/app/admin-token` | conferido contra o ExternalSecret `app-secrets` |
 | `eso/cluster-secret-store` | `aws-secrets-manager` | conferido contra o `secretStoreRef` dos ExternalSecrets |
 | `dns/enabled` | `true` ou `false` | escolhe HTTP ou HTTPS, combinado ao perfil `core|full` |
