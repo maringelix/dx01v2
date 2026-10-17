@@ -952,6 +952,7 @@ register_checks() {
   register static npm-ci check_npm_ci
   register static region-target 'bash scripts/tests/region-target.sh'
   register static capacity-client 'node --test e2e/capacity.test.mjs'
+  register static cost-labels 'bash scripts/tests/cost-labels.sh'
   register static regional-smoke 'bash scripts/tests/regional-smoke.sh'
   register static ssm-batches 'bash scripts/tests/ssm.sh'
   register static eslint check_eslint
