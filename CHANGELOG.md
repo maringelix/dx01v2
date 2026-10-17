@@ -7,6 +7,10 @@ All notable changes to this project are documented here. The format follows
 ## [Unreleased]
 ### Fixed
 
+- Permit HBONE on the generated Istio waypoint under namespace default-deny, with egress limited
+  to the app, mesh demo, control plane and telemetry. AuthorizationPolicy still enforces client
+  identity and HTTP rules; the waypoint Service remains ClusterIP.
+
 - The platform rollback exercise pins its mesh demo to the tested R8 API image while it deploys the
   older application image. This keeps the mesh pods healthy when the earlier release predates the
   mesh demo, and still exercises an actual previous app artifact. The workflow source check also

@@ -1,3 +1,59 @@
+# The waypoint is a generated pod in this default-deny namespace. Its HBONE listener must accept
+# traffic from the ingress Gateway and ztunnel; Istio AuthorizationPolicies authenticate the original
+# principal at L7. The Service is ClusterIP only. Egress stays limited to the app, mesh demo, istiod
+# and the OpenTelemetry Collector.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: waypoint-traffic
+spec:
+  podSelector:
+    matchLabels:
+      gateway.networking.k8s.io/gateway-name: dx01v2-waypoint
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - ports:
+        - protocol: TCP
+          port: 15008
+    - from:
+        - ipBlock:
+            cidr: 169.254.7.127/32
+      ports:
+        - protocol: TCP
+          port: 15021
+  egress:
+    - to:
+        - podSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values: [api, web, mesh-demo]
+      ports:
+        - protocol: TCP
+          port: 15008
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: istio-system
+          podSelector:
+            matchLabels:
+              app: istiod
+      ports:
+        - protocol: TCP
+          port: 15012
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: monitoring
+          podSelector:
+            matchLabels:
+              app.kubernetes.io/name: opentelemetry-collector
+      ports:
+        - protocol: TCP
+          port: 15008
+        - protocol: TCP
+          port: 4317
+---
 # ztunnel and the CNI allow only the waypoint HBONE path to the demo backends. The AWS node-health
 # probe exception is narrow and does not expose the HTTP service to other workloads.
 apiVersion: networking.k8s.io/v1
