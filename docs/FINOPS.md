@@ -51,7 +51,7 @@ de produção automaticamente. VPA Off não compete com HPA sobre requests.
 
 EKS usa Cluster Autoscaler com Pod Identity; a aula Spot do tx01v2 usa
 tarefa descartável com deadline/fallback on-demand explícito, preservando o app
-crítico. Aumentar réplicas no kind não comprova escala gerenciada ou preço de GCP.
+crítico. Aumentar réplicas no kind não comprova escala gerenciada ou preço da AWS.
 Use o gate de estimativa, budget e expiração do tx01v2 antes de qualquer apply;
 não trate OpenCost como fatura nem budget como teto de cobrança.
 
