@@ -1,5 +1,7 @@
 # dx01v2
 
+R9 data recovery and proof limits: [docs/CONTINUIDADE.md](docs/CONTINUIDADE.md).
+
 Application half of a DevOps lab: a small message board (Express 5 API, React 19 page, PostgreSQL 17) with containers, Kubernetes manifests and a kind end-to-end test.
 
 [![ci](https://github.com/maringelix/dx01v2/actions/workflows/ci.yml/badge.svg)](https://github.com/maringelix/dx01v2/actions/workflows/ci.yml)

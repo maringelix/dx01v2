@@ -62,8 +62,18 @@ const api = image(required(actual, 'API_IMAGE'), 'API_IMAGE');
 const web = image(required(actual, 'WEB_IMAGE'), 'WEB_IMAGE');
 const apiExample = image(required(example, 'API_IMAGE'), 'example API_IMAGE');
 const webExample = image(required(example, 'WEB_IMAGE'), 'example WEB_IMAGE');
-if (api.name !== apiExample.name || web.name !== webExample.name) {
-  fail('runtime image repositories must match the AWS ECR repositories in params.example.env');
+for (const [image, component] of [
+  [api, 'api'],
+  [web, 'web'],
+  [apiExample, 'api'],
+  [webExample, 'web'],
+]) {
+  if (
+    !image.name.endsWith(`/dx01v2/${component}`) ||
+    !/^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?\//.test(image.name)
+  ) {
+    fail('runtime and example repositories must be AWS ECR dx01v2 images');
+  }
 }
 const patches = [];
 const addPatch = (kind, name, path, value) => {
@@ -96,9 +106,13 @@ if (overlay.startsWith('aws-https')) {
   );
 }
 
+addPatch('ExternalSecret', 'db-credentials', '/spec/target/template/data/DB_HOST', required(actual, 'DB_ENDPOINT'));
+const target = process.env.LAB_TARGET || 'primary';
+if (!['primary', 'secondary'].includes(target)) fail('invalid LAB_TARGET');
 const document = {
   spec: {
     source: {
+      targetRevision: target === 'secondary' ? 'gitops/aws-dr' : 'gitops/aws',
       path: `deploy/k8s/overlays/${overlay}`,
       kustomize: {
         images: [`${apiExample.name}=${api.reference}`, `${webExample.name}=${web.reference}`],

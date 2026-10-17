@@ -78,6 +78,16 @@ replacements:
   - source:
       kind: ConfigMap
       name: deploy-params
+      fieldPath: data.DB_ENDPOINT
+    targets:
+      - select:
+          kind: ExternalSecret
+          name: db-credentials
+        fieldPaths:
+          - spec.target.template.data.DB_HOST
+  - source:
+      kind: ConfigMap
+      name: deploy-params
       fieldPath: data.API_IMAGE
     targets:
       - select:

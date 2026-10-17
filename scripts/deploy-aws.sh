@@ -30,10 +30,15 @@ source "$(dirname "${BASH_SOURCE[0]}")/lib/common.sh"
 source "$REPO_ROOT/scripts/lib/k8s.sh"
 # shellcheck source=scripts/lib/deploy-mode.sh
 source "$REPO_ROOT/scripts/lib/deploy-mode.sh"
+# shellcheck source=scripts/lib/ssm.sh
+source "$REPO_ROOT/scripts/lib/ssm.sh"
 export PATH="$REPO_ROOT/.tools/bin:$PATH"
 
 NAMESPACE=dx01v2
 SSM_PREFIX=/tx01v2/lab
+# shellcheck source=scripts/lib/region-target.sh
+source "$REPO_ROOT/scripts/lib/region-target.sh"
+select_region_target "${LAB_TARGET:-primary}"
 # Contract: every parameter the deploy reads (the harness check contract-app verifies this list).
 SSM_NAMES=(
   "$SSM_PREFIX/region"
@@ -44,6 +49,7 @@ SSM_NAMES=(
   "$SSM_PREFIX/ecr/api-url"
   "$SSM_PREFIX/ecr/web-url"
   "$SSM_PREFIX/waf/acl-arn"
+  "$SSM_PREFIX/db/endpoint"
   "$SSM_PREFIX/db/secret-name"
   "$SSM_PREFIX/app/admin-token-secret-name"
   "$SSM_PREFIX/eso/cluster-secret-store"
@@ -53,7 +59,6 @@ SSM_NAMES=(
   "$SSM_PREFIX/dns/acm-certificate-arn"
 )
 # Values hard-coded in deploy/k8s/components/aws: the copy published by tx01v2 must agree.
-CONTRACT_CLUSTER=tx01v2-lab
 CONTRACT_DB_SECRET=tx01v2-lab/db/app
 CONTRACT_ADMIN_TOKEN_SECRET=tx01v2-lab/app/admin-token
 CONTRACT_SECRET_STORE=aws-secrets-manager
@@ -175,7 +180,7 @@ preflight() {
 
 read_contract() {
   local out name value n zone_id
-  out="$(aws ssm get-parameters --names "${SSM_NAMES[@]}" --query 'Parameters[].[Name,Value]' --output text)" ||
+  out="$(read_ssm_parameters "${SSM_NAMES[@]}")" ||
     die "cannot read the SSM parameters $SSM_PREFIX/* (was tx01v2 terraform/envs/lab applied in $AWS_REGION?)"
   while IFS=$'\t' read -r name value; do
     if [[ -n "$name" ]]; then
@@ -187,6 +192,7 @@ read_contract() {
   done
   expect_param region "$AWS_REGION"
   expect_param cluster-name "$CONTRACT_CLUSTER"
+  [[ "$(param db/endpoint)" =~ ${K8S_PARAM_PATTERN[DB_ENDPOINT]} ]] || die 'contract database endpoint is not an owned lab RDS TLS hostname'
   expect_param db/secret-name "$CONTRACT_DB_SECRET"
   expect_param app/admin-token-secret-name "$CONTRACT_ADMIN_TOKEN_SECRET"
   expect_param eso/cluster-secret-store "$CONTRACT_SECRET_STORE"
@@ -314,6 +320,7 @@ write_params() {
     echo "MESH_IMAGE=$API_IMAGE"
     echo "WEB_IMAGE=$WEB_IMAGE"
     echo "WAF_ACL_ARN=$(param waf/acl-arn)"
+    echo "DB_ENDPOINT=$(param db/endpoint)"
     echo "VPC_CIDR=$(param vpc-cidr)"
     echo "ALB_SOURCE_CIDR=$(param alb/source-cidr)"
     echo "ALB_CERTIFICATE_ARN=$ALB_CERTIFICATE_ARN"
@@ -433,6 +440,12 @@ wait_for_ingress() {
 }
 
 smoke() {
+  if [[ "$LAB_TARGET" == secondary && "$DNS_ENABLED" == true ]]; then
+    local selected_address
+    selected_address="$(getent ahostsv4 "$ALB_HOSTNAME" | awk 'NR == 1 { print $1 }')"
+    bash "$REPO_ROOT/scripts/regional-smoke.sh" "$APP_DOMAIN_NAME" "$selected_address" "$GIT_SHA" | tee "$WORK_DIR/smoke.txt"
+    return
+  fi
   local token status=0 smoke_host
   if [[ "$DNS_ENABLED" == true ]]; then
     BASE="https://$APP_DOMAIN_NAME"

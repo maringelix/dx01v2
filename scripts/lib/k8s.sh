@@ -22,6 +22,7 @@ declare -A K8S_LOCAL_PARAM_PATTERN=(
 # Formats accepted for every deploy parameter (values come from SSM, docs/CONTRATO.md).
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_PARAM_PATTERN=(
+  [DB_ENDPOINT]='^tx01v2-lab(-dr)?-postgres\.[a-z0-9.-]+\.rds\.amazonaws\.com(\.cn)?$'
   [API_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [MESH_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/api(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
   [WEB_IMAGE]='^[0-9]{12}\.dkr\.ecr\.[a-z0-9-]+\.amazonaws\.com(\.cn)?/dx01v2/web(:[0-9a-f]{40}|@sha256:[0-9a-f]{64})$'
