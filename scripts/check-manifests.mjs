@@ -96,6 +96,13 @@ function load(file) {
 const find = (objs, kind, name) => objs.find((o) => o.kind === kind && o.metadata?.name === name);
 
 function podChecks(where, workload) {
+  for (const key of ['cost.lab/owner', 'cost.lab/environment']) {
+    check(
+      typeof workload.spec?.template?.metadata?.labels?.[key] === 'string' &&
+        workload.spec.template.metadata.labels[key].length > 0,
+      where + ': mandatory showback label ' + key,
+    );
+  }
   const spec = workload.spec?.template?.spec ?? {};
   const pod = spec.securityContext ?? {};
   check(pod.runAsNonRoot === true, `${where}: pod securityContext.runAsNonRoot must be true`);
