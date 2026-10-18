@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Deploys dx01v2 to the EKS lab cluster of tx01v2 (docs/CONTRATO.md).
+# Deploys dx01v2 to the EKS lab cluster of tx01v2 (docs/CONTRACT.md).
 # CLOUD-MUTATING and billable: promotes images to ECR and makes the AWS Load Balancer Controller
 # create an internet-facing ALB. Run it only on purpose, after the tx01v2 apply + platform steps;
 # the teardown is the tx01v2 destroy. Not run in the cloud yet (v2).
@@ -105,7 +105,7 @@ section() {
 param() { printf '%s' "${PARAM[$SSM_PREFIX/$1]}"; }
 
 expect_param() { # NAME VALUE
-  [[ "$(param "$1")" == "$2" ]] || die "SSM $SSM_PREFIX/$1 is '$(param "$1")' but the manifests expect '$2' (docs/CONTRATO.md)"
+  [[ "$(param "$1")" == "$2" ]] || die "SSM $SSM_PREFIX/$1 is '$(param "$1")' but the manifests expect '$2' (docs/CONTRACT.md)"
 }
 
 write_summary() { # RESULT
@@ -188,7 +188,7 @@ read_contract() {
     fi
   done <<<"$out"
   for n in "${SSM_NAMES[@]}"; do
-    [[ -n "${PARAM[$n]:-}" ]] || die "the SSM parameter $n is missing (docs/CONTRATO.md)"
+    [[ -n "${PARAM[$n]:-}" ]] || die "the SSM parameter $n is missing (docs/CONTRACT.md)"
   done
   expect_param region "$AWS_REGION"
   expect_param cluster-name "$CONTRACT_CLUSTER"

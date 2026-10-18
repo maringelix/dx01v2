@@ -6,6 +6,11 @@ All notable changes to this project are documented here. The format follows
 
 ## [Unreleased]
 
+- Standardize documentation, historical evidence, templates and instructions in English; rename
+  document paths and use one README linked to the central onboarding guide. Refresh AWS
+  publication/promotion prerequisites. Translate public UI copy and locale to English without
+  changing application behavior or payload contracts; retain Unicode test data.
+
 - R9: consume contract v7 in either region, preserve current replicated credentials while selecting
   the regional database endpoint, isolate GitOps branches and verify recovery before DNS cutover.
 
@@ -49,7 +54,7 @@ All notable changes to this project are documented here. The format follows
   fixture. A manual, no-rebuild publication workflow verifies the exact successful CI run, creates
   SPDX SBOM and SLSA provenance attestations for GHCR image digests with keyless Sigstore signing,
   and tests rejection of an unsigned image and incorrect signer/issuer. See
-  [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md); CI evidence is required before this capability is
+  [docs/CI_SECURITY.md](docs/CI_SECURITY.md); CI evidence is required before this capability is
   marked verified.
 
 - The application DAST policy now fails on selected missing security headers, while retaining all
@@ -145,7 +150,7 @@ All notable changes to this project are documented here. The format follows
   repository variable of the same name): a fork can test against its own tx01v2. A pinned commit that is
   not in that repository fails with a clear message.
 - The devcontainer declares 4 CPUs and 8 GB (the platform e2e runs the whole local lab).
-- The app on the full local platform of tx01v2 (docs/LAB_LOCAL.md): overlay `local-platform`
+- The app on the full local platform of tx01v2 (docs/LOCAL_LAB.md): overlay `local-platform`
   (Istio Gateway with HTTPS from cert-manager, HTTPRoutes, ExternalSecrets from `local-secrets`, HPA,
   `PeerAuthentication` STRICT, `AuthorizationPolicy` by identity, NetworkPolicies with HBONE,
   ServiceMonitor, five alert rules, a Grafana dashboard); `scripts/deploy-local.sh` (images to the lab
@@ -157,7 +162,7 @@ All notable changes to this project are documented here. The format follows
 - README status matrix: repository settings as code are applied (read back with `gh api`).
 
 - Initial v2 of the AWS application lab, rebuilt from scratch with the lessons of v1
-  (docs/ARQUITETURA.md, "v1 → v2"):
+  (docs/ARCHITECTURE.md, "v1 → v2"):
   - `api/`: Express 5 + TypeScript (strict, ESM) on Node.js 24 — message board with zod validation,
     JSON error model, per-client write rate limit keyed on `req.ip` with `trust proxy` as a hop
     count, constant-time admin token check, request IDs, pino logs with redaction, Prometheus
@@ -184,7 +189,7 @@ All notable changes to this project are documented here. The format follows
 ### Changed
 
 - `deploy/local/tx01v2.ref` follows tx01v2 to `3895fc2` (tx01v2#12, the debts round of the roadmap).
-- Comments, script messages and docs say "the contract" or point to `docs/CONTRATO.md` instead of
+- Comments, script messages and docs say "the contract" or point to `docs/CONTRACT.md` instead of
   "contract v1": the contract has been at version 2 since round 1 (roadmap S.8).
 - The family table of both READMEs links the family hub `tx00v2` (roadmap, family guardrails,
   cross-repo checks).
@@ -200,9 +205,9 @@ All notable changes to this project are documented here. The format follows
 - Dependabot ignores minor and major updates of `typescript` (typescript-eslint 8.71 accepts
   `<6.1.0`; a TypeScript 7 PR failed `npm ci` with ERESOLVE) and minor updates of
   `nginxinc/nginx-unprivileged` (they would move the web image from the stable to the mainline nginx
-  line). Both rules are reviewed in the quarterly routine (docs/SUSTENTACAO.md).
+  line). Both rules are reviewed in the quarterly routine (docs/MAINTENANCE.md).
 - The README family table links the Azure pair (`tx02v2`, `dx02v2`), now public; `dx02v2` runs this
-  same application. AGENTS.md (rule 8) and docs/SUSTENTACAO.md (quarterly routine) add the parity
+  same application. AGENTS.md (rule 8) and docs/MAINTENANCE.md (quarterly routine) add the parity
   rule between the app repositories.
 - One integration test case more, ported from `dx02v2` for parity: the comma-only
   `X-Forwarded-For` format of Application Gateway for Containers (`api/test/integration/rate-limit.test.ts`).
@@ -213,8 +218,9 @@ All notable changes to this project are documented here. The format follows
   with `TRUST_PROXY_HOPS=2` (`api/test/integration/rate-limit.test.ts`).
 - Dependabot ignores major bumps of the `node` build image (it follows `.nvmrc` and `engines.node`;
   a `node:26` bump fails `npm ci` with EBADENGINE).
-- docs/SUSTENTACAO.md, "Estado atual": the stages say `verificado no CI` (the README already did).
+- docs/MAINTENANCE.md, "Current state": the stages say `verified in CI` (the README already did).
 
-## R10: capacidade e FinOps
+## R10: capacity and FinOps
 
-Veja [Capacidade e SLO](docs/FINOPS.md) para carga limitada, HPA up/down, PDB/drain, rightsizing, pool PostgreSQL e showback. Prova Docker em Actions; nada executado na nuvem (v2).
+See [Capacity and SLO](docs/FINOPS.md) for bounded load, HPA scale-up/down, PDB/drain,
+rightsizing, PostgreSQL pooling and showback. Docker proof runs in Actions; nothing has run in AWS v2.

@@ -19,7 +19,7 @@ declare -A K8S_LOCAL_PARAM_PATTERN=(
   [DB_ENDPOINT_CIDR]='^(10|172|192)\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}/32$'
 )
 
-# Formats accepted for every deploy parameter (values come from SSM, docs/CONTRATO.md).
+# Formats accepted for every deploy parameter (values come from SSM, docs/CONTRACT.md).
 # shellcheck disable=SC2034 # read through a nameref in k8s_validate_params
 declare -A K8S_PARAM_PATTERN=(
   [DB_ENDPOINT]='^tx01v2-lab(-dr)?-postgres\.[a-z0-9.-]+\.rds\.amazonaws\.com(\.cn)?$'

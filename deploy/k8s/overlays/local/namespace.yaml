@@ -1,4 +1,4 @@
-# Same labels as the namespace tx01v2 creates on EKS (docs/CONTRATO.md), minus the ALB readiness gate.
+# Same labels as the namespace tx01v2 creates on EKS (docs/CONTRACT.md), minus the ALB readiness gate.
 apiVersion: v1
 kind: Namespace
 metadata:

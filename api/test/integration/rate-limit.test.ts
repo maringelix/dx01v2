@@ -65,7 +65,7 @@ describe('write rate limit', () => {
   it('reads the client from the comma-only X-Forwarded-For of Application Gateway for Containers', async () => {
     // AGC appends the address it received the request from, comma delimited without a space
     // (docs "Application Gateway for Containers components", checked 2026-10-11). Kept identical
-    // to dx02v2, which runs this same app behind AGC (parity routine, docs/SUSTENTACAO.md).
+    // to dx02v2, which runs this same app behind AGC (parity routine, docs/MAINTENANCE.md).
     const t = app('1');
     const statuses: number[] = [];
     for (let i = 1; i <= LIMIT + 1; i++) {

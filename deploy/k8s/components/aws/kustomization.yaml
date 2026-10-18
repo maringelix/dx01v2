@@ -1,4 +1,4 @@
-# EKS (tx01v2, docs/CONTRATO.md). Namespace-scoped resources only: the dx01v2 namespace, the
+# EKS (tx01v2, docs/CONTRACT.md). Namespace-scoped resources only: the dx01v2 namespace, the
 # ClusterSecretStore and the deployer RBAC belong to tx01v2. Values read from SSM at deploy time
 # (image URLs, WAF ARN, VPC CIDR) arrive through params.env (gitignored, written by
 # scripts/deploy-aws.sh into a temporary copy of deploy/k8s; params.example.env is what CI

@@ -1,7 +1,7 @@
 # AGENTS.md
 
 Instructions for AI coding agents and humans working in `dx01v2`. `CLAUDE.md` points here; this file
-is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
+is the source of truth. The full rule list is [docs/GUARDRAILS.md](docs/GUARDRAILS.md).
 
 ## 1. Mission and context
 
@@ -18,10 +18,11 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
   `not run in the cloud (v2)`).
 - The app also runs on the full local platform of tx01v2 (kind, Istio ambient, Argo CD, Prometheus,
   Loki, Tempo and the OpenTelemetry Collector, Gatekeeper, Trivy Operator, chaos): overlay `local-platform`, `scripts/deploy-local.sh` (GitOps)
-  and `make e2e-platform` (CI job `e2e-platform`, [docs/LAB_LOCAL.md](docs/LAB_LOCAL.md)). It is not
-  cloud-mutating: agents may run it, one heavy run at a time (Docker with 8 GB, or 7 GB with `LOCAL_SIZE=small`;
+  and `make e2e-platform` (CI job `e2e-platform`, [docs/LOCAL_LAB.md](docs/LOCAL_LAB.md)). It is not
+  cloud-mutating: agents may run it, one heavy run at a time (12 GiB recommended for HA/FinOps,
+  or 7 GiB for the one-node `LOCAL_SIZE=small`;
   `make e2e-platform-small` is meant for the CI runner).
-- The interface with `tx01v2` is [docs/CONTRATO.md](docs/CONTRATO.md) (contract v4, owned by tx01v2; the
+- The interface with `tx01v2` is [docs/CONTRACT.md](docs/CONTRACT.md) (contract v7, owned by tx01v2; the
   local lab has its own local contract, `lab-system/lab-contract`).
 
 ## 2. Non-negotiable rules
@@ -48,6 +49,9 @@ is the source of truth. The full rule list (pt-BR) is [docs/GUARDRAILS.md](docs/
 
 ## 3. Repo map
 
+English-only documentation: maintain all public documentation, agent instructions, templates and explanatory prose in English.
+Start fork onboarding with [the central guide](https://github.com/maringelix/tx00v2/blob/main/docs/GETTING_STARTED.md).
+
 ```text
 api/                    Express 5 API (src/, migrations/*.sql, test/unit, test/integration, Dockerfile)
 web/                    React 19 page (src/, nginx/default.conf + security-headers.conf, Dockerfile)
@@ -72,7 +76,7 @@ scripts/lib/            shared bash helpers (common, tools, k8s)
 tools/                  versions.env and checksums.txt of the harness tools
 .github/                ci.yml (static, test, images, e2e), deploy-aws.yml, ruleset, templates, Dependabot
 .devcontainer/          Node.js 24 + Docker-in-Docker, pinned by digest (runs make tools)
-docs/                   pt-BR docs: architecture, API, contract, runbook, guardrails, harness, sustainment
+docs/                   English docs: architecture, API, contract, runbook, guardrails, harness, maintenance
 FORK.md                 how to fork the lab: what GitHub does not copy, the local lab, your own cloud account
 ```
 
@@ -112,7 +116,7 @@ FORK.md                 how to fork the lab: what GitHub does not copy, the loca
 
 ## 7. Playbooks
 
-**Maintainer / sustentação.** Follow [docs/SUSTENTACAO.md](docs/SUSTENTACAO.md): react to a red
+**Maintainer / maintenance.** Follow [docs/MAINTENANCE.md](docs/MAINTENANCE.md): react to a red
 scheduled CI (often a new CVE in a base image), merge monthly Dependabot PRs, run the quarterly
 review (harness tools, image digests, Node.js/PostgreSQL/Kubernetes calendar, kubeconform schema
 commits, ignores close to `expired_at`).
@@ -149,7 +153,7 @@ leftover check, and file a `cloud_run_report` issue. Never leave a lab running u
   expectations in `e2e/smoke.mjs`.
 - Change a NetworkPolicy: update `scripts/check-manifests.mjs` and the probes in `scripts/e2e-kind.sh`.
 - Bump a harness tool: `scripts/update-tool-checksums.sh <tool> <version>`, then `make tools verify`.
-- Add a check: docs/HARNESS.md ("Como adicionar um check").
+- Add a check: docs/HARNESS.md ("Adding a check").
 
 ## 9. When to stop and ask a human
 
