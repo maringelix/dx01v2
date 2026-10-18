@@ -1,12 +1,10 @@
 # dx01v2
 
-R9 data recovery and proof limits: [docs/CONTINUIDADE.md](docs/CONTINUIDADE.md).
+R9 data recovery and proof limits: [docs/CONTINUITY.md](docs/CONTINUITY.md).
 
 Application half of a DevOps lab: a small message board (Express 5 API, React 19 page, PostgreSQL 17) with containers, Kubernetes manifests and a kind end-to-end test.
 
 [![ci](https://github.com/maringelix/dx01v2/actions/workflows/ci.yml/badge.svg)](https://github.com/maringelix/dx01v2/actions/workflows/ci.yml)
-
-[Português](README.pt-BR.md)
 
 **Fork this lab:** [FORK.md](FORK.md) takes you from a fork to a running lab, on your machine first, then in your own cloud account.
 
@@ -25,7 +23,7 @@ The lab family (v2):
 |---|---|---|---|
 | [`tx00v2`](https://github.com/maringelix/tx00v2) | all three | family hub: roadmap, family guardrails, cross-repo checks | see its status matrix |
 | [`tx01v2`](https://github.com/maringelix/tx01v2) | AWS | infrastructure (Terraform, EKS, RDS, platform layer) | see its status matrix |
-| `dx01v2` (this repo) | AWS | application (built against `docs/CONTRATO.md`) | see status matrix |
+| `dx01v2` (this repo) | AWS | application (built against `docs/CONTRACT.md`) | see status matrix |
 | [`tx02v2`](https://github.com/maringelix/tx02v2) | Azure | infrastructure (Terraform, AKS, PostgreSQL Flexible Server, Application Gateway for Containers) | see its status matrix |
 | [`dx02v2`](https://github.com/maringelix/dx02v2) | Azure | application (the same app as this repository) | see its status matrix |
 | [`tx03v2`](https://github.com/maringelix/tx03v2) | GCP | infrastructure (Terraform, GKE Autopilot, Cloud SQL, Cloud Armor) | see its status matrix |
@@ -46,7 +44,7 @@ The lab family (v2):
 | Compose stack (PostgreSQL → migrate → api → web on 127.0.0.1) + smoke test | `verified locally` | `scripts/dev-env.sh`, `scripts/compose-smoke.sh` (manual, not part of CI) |
 | kind end-to-end: Pod Security `restricted`, smoke test through nginx, NetworkPolicy enforcement | `verified in CI` | `make e2e` (`scripts/e2e-kind.sh`); CI job `e2e` |
 | AWS deploy (`core`/`full`, verified GHCR release, signed digest promotion to ECR, EKS of tx01v2, GitOps, ALB + WAF, optional Route53/ACM HTTPS, ambient mesh canary/retries/circuit breaking, traces to X-Ray) | `implemented as code; not run in the cloud (v2)` | `.github/workflows/deploy-aws.yml`, `scripts/deploy-aws.sh`, `docs/RUNBOOK.md` |
-| Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLICACAO.md`) |
+| Repository settings as code (ruleset, environment `lab`) | `verified locally` | `scripts/repo-guardrails.sh` applied; read back with `gh api` on 2026-10-14 (`docs/PUBLISHING.md`) |
 | **The app on the full local platform of tx01v2** (kind + emulated ECR, RDS, S3, load balancer, git server): images to the lab registry, GitOps with Argo CD (Synced, Healthy, self-heal) | `verified in CI` | `make e2e-platform` (`scripts/deploy-local.sh`, `scripts/e2e-platform.sh`, overlay `local-platform`) |
 | HTTPS through the emulated load balancer and an Istio Gateway (cert-manager, lab CA), smoke test from outside the mesh; database TLS `verify-full` | `verified in CI` | `make e2e-platform` (probe `smoke`) |
 | Istio ambient: mTLS `STRICT`, `AuthorizationPolicy` by identity (Gateway, web, Prometheus), NetworkPolicies with HBONE | `verified in CI` | `contract-app` (`local-platform`); `make e2e-platform` (probe `mesh`) |
@@ -55,7 +53,7 @@ The lab family (v2):
 | Gatekeeper (the app is admitted under the lab policies), Trivy Operator reports of the app images, HPA 2-4 | `verified in CI` | `make e2e-platform` |
 | Zero-downtime rollout: a new version through GitOps, no failed request from a reader during the rolling update | `verified in CI` | `make e2e-platform` (probe `rollout`) |
 | Database backup + restore drill; chaos experiments with hypotheses (one API pod killed, reads stay up; 200 ms between the API and PostgreSQL, reads pass and the trace shows the delay) | `verified in CI` | `make e2e-platform` (probes `backup`, `chaos`) |
-| The same 18 probes in 7 GB of Docker memory: the platform at the small size (`LOCAL_SIZE=small`), inside a Docker-in-Docker without swap | `verified in CI` | `make e2e-platform-small` (`scripts/e2e-platform-small.sh`); CI job `e2e-platform-small` |
+| App probes in 7 GB of Docker memory: the platform at the small size (`LOCAL_SIZE=small`), inside Docker-in-Docker without swap | `verified in CI` | `make e2e-platform-small` (`scripts/e2e-platform-small.sh`); CI job `e2e-platform-small`; historical counts in LOCAL_LAB |
 
 `verified in CI` rows run on every pull request, on every push to `main` and weekly (CI jobs in the
 Evidence column); the compose row is verified locally only. The AWS row changes only with a
@@ -66,7 +64,7 @@ Evidence column); the compose row is verified locally only. The AWS row changes 
 The CI includes CodeQL `security-extended`, a real SonarQube Community Build quality gate with LCOV,
 Trivy dependency and image scans, and OWASP ZAP Baseline against an isolated local Compose stack.
 Sonar has no paid-service or production-secret dependency. The limits and evidence for each check are
-in [docs/SEGURANCA_CI.md](docs/SEGURANCA_CI.md). Run `make build && make dast` locally for DAST.
+in [docs/CI_SECURITY.md](docs/CI_SECURITY.md). Run `make build && make dast` locally for DAST.
 
 ## Architecture
 
@@ -80,11 +78,11 @@ flowchart LR
 ```
 
 - Local (compose) and kind: one reverse proxy (web nginx) in front of the API (`TRUST_PROXY_HOPS=1`).
-- AWS: the ALB (with the WAF of tx01v2) routes `/api` to the API and `/` to the web; secrets come
+- AWS: the ALB (with the WAF of tx01v2) routes `/` to web; web nginx proxies `/api` to API. Secrets come
   from Secrets Manager through External Secrets; the namespace, IAM and RDS belong to tx01v2. The
   deploy workflow detects whether the Argo CD Application exists and selects GitOps or direct apply;
   choose `auto`, `gitops` or `push` in the workflow when deploying a fork.
-- Design decisions, diagrams per environment and the v1 → v2 table: [docs/ARQUITETURA.md](docs/ARQUITETURA.md).
+- Design decisions, diagrams per environment and the v1 → v2 table: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 ## Quick start (free, local)
 
@@ -116,7 +114,7 @@ examples: [docs/API.md](docs/API.md).
 
 **Cost first:** the app runs on the tx01v2 lab, about US$0.26–0.32 per hour in us-east-1 with its
 defaults, including the ALB this app creates (reference list prices, see the
-[tx01v2 cost doc](https://github.com/maringelix/tx01v2/blob/main/docs/CUSTOS.md)). A forgotten lab
+[tx01v2 cost doc](https://github.com/maringelix/tx01v2/blob/main/docs/COSTS.md)). A forgotten lab
 costs more than US$40 per week. Use a dedicated AWS account and destroy on the same day.
 
 Follow [docs/RUNBOOK.md](docs/RUNBOOK.md): tx01v2 bootstrap/apply/platform → GitHub variables →
@@ -134,7 +132,7 @@ Argo CD → smoke test through the ALB → tx01v2 destroy + leftover check → c
 | `make verify` | static + test | before every PR |
 | `make build` | `scripts/harness.sh build`: npm build, images, image policy, trivy gate | when code, Dockerfiles or dependencies change |
 | `make e2e` | `scripts/harness.sh e2e`: kind cluster, smoke test, NetworkPolicy probes | when manifests, images or the app change |
-| `make e2e-platform` | `scripts/harness.sh platform`: the app on the full tx01v2 local platform (clones tx01v2 at `deploy/local/tx01v2.ref`), always torn down (CI job `e2e-platform`) | manifest, image or app changes; needs Docker with 8 GB, or 7 GB with `LOCAL_SIZE=small` |
+| `make e2e-platform` | `scripts/harness.sh platform`: the app on the full tx01v2 local platform (clones `deploy/local/tx01v2.ref`), always torn down | current HA CI: 12 GiB/default size; historical single node: about 8 GB, or 7 GB with `LOCAL_SIZE=small` |
 | `make e2e-platform-small` | `scripts/harness.sh platform-small`: the same e2e at the small size inside a Docker limited to 7 GB, with the peak memory and any OOM kill in the job summary (CI job `e2e-platform-small`) | heavy, meant for the CI runner; on a laptop run `LOCAL_SIZE=small make e2e-platform` |
 | `make all` | every stage | before a release-like merge |
 | `make clean` | removes `.tools/`, build output, coverage, `node_modules` and scratch data | — |
@@ -143,19 +141,20 @@ Argo CD → smoke test through the ALB → tx01v2 destroy + leftover check → c
 
 ## Docs
 
-All docs are in Brazilian Portuguese.
+All public documentation is written in English. Start with the
+[complete lab onboarding guide](https://github.com/maringelix/tx00v2/blob/main/docs/GETTING_STARTED.md).
 
 | Doc | Content |
 |---|---|
 | [FORK.md](FORK.md) | fork the lab: what GitHub does not copy, the local lab, your own cloud account |
-| [docs/ARQUITETURA.md](docs/ARQUITETURA.md) | diagrams (local, kind, AWS), decisions, v1 → v2 |
+| [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) | diagrams (local, kind, AWS), decisions, v1 → v2 |
 | [docs/API.md](docs/API.md) | endpoints, errors, curl examples |
-| [docs/CONTRATO.md](docs/CONTRATO.md) | tx01v2 ⇄ dx01v2 contract v6 (app side; source of truth in tx01v2) |
+| [docs/CONTRACT.md](docs/CONTRACT.md) | tx01v2 ⇄ dx01v2 contract v7 (app side; source of truth in tx01v2) |
 | [docs/RUNBOOK.md](docs/RUNBOOK.md) | local development, compose, kind e2e, AWS deploy |
 | [docs/GUARDRAILS.md](docs/GUARDRAILS.md) | rules, enforcement, exceptions, limits |
 | [docs/HARNESS.md](docs/HARNESS.md) | checks, strict mode, troubleshooting |
-| [docs/SUSTENTACAO.md](docs/SUSTENTACAO.md) | routines, end-of-support calendar, update procedures |
-| [docs/PUBLICACAO.md](docs/PUBLICACAO.md) | checklist to make the repository public |
+| [docs/MAINTENANCE.md](docs/MAINTENANCE.md) | routines, end-of-support calendar, update procedures |
+| [docs/PUBLISHING.md](docs/PUBLISHING.md) | checklist to make the repository public |
 
 ## Contributing
 
@@ -166,6 +165,8 @@ issues: [SECURITY.md](SECURITY.md).
 
 [MIT](LICENSE) — Copyright (c) 2025-2026 Bruno Maringeli.
 
-## R10: capacidade e FinOps
+## R10: capacity and FinOps
 
-Veja [Capacidade e SLO](docs/FINOPS.md) para carga limitada, HPA up/down, PDB/drain, rightsizing, pool PostgreSQL e showback. Prova Docker em Actions; nada executado na nuvem (v2).
+See [Capacity and SLO](docs/FINOPS.md) for bounded load, HPA scale-up/down, PDB/drain,
+rightsizing, PostgreSQL pooling and showback. Docker proof runs in Actions;
+`not run in the cloud (v2)`.

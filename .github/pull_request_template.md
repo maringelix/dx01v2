@@ -10,7 +10,7 @@
 - [ ] No new scanner ignore, or each new one has `statement` + `expired_at` and is explained below
 - [ ] No coverage threshold lowered and no check disabled or skipped
 - [ ] No IAM, network (NetworkPolicy), RBAC or CORS widening, or the reason is stated below
-- [ ] Contract (docs/CONTRATO.md) unchanged, or version bumped with a coordinated tx01v2 PR linked below
+- [ ] Contract (docs/CONTRACT.md) unchanged, or version bumped with a coordinated tx01v2 PR linked below
 - [ ] Every new dependency, action or image is pinned (exact npm version + lockfile / commit SHA / digest)
 - [ ] No secrets or real identifiers (account IDs, IPs, e-mails) in code, docs or examples
 

@@ -1,5 +1,8 @@
 # Contributing
 
+Write all maintained documentation, public explanatory prose and templates in English. Start with
+the [central onboarding guide](https://github.com/maringelix/tx00v2/blob/main/docs/GETTING_STARTED.md).
+
 Thanks for helping. This lab only claims what its harness proves, so every change goes through it.
 
 Forking the lab to run it on your own machine and cloud account? Start with [FORK.md](FORK.md).
@@ -21,12 +24,11 @@ Forking the lab to run it on your own machine and cloud account? Start with [FOR
 - Do not weaken checks, lower coverage thresholds or add scanner ignores without `statement` and
   `expired_at`.
 - Explain any IAM, NetworkPolicy, RBAC, Ingress or CORS widening in the PR.
-- Contract changes (`docs/CONTRATO.md`) need a coordinated PR in `tx01v2` and a version bump.
+- Contract changes (`docs/CONTRACT.md`) need a coordinated PR in `tx01v2` and a version bump.
 - Pin new dependencies (exact npm versions and the lockfile), actions (full commit SHA +
   `# vX.Y.Z`), images (digest) and tools (version + SHA256).
 - UI: no inline styles or scripts (the CSP forbids them); render user text as text.
-- Docs live in Brazilian Portuguese (`docs/`, `README.pt-BR.md`); `README.md`, `AGENTS.md`,
-  `CONTRIBUTING.md`, `SECURITY.md` and `CHANGELOG.md` in English.
+- Maintain documentation, historical explanatory prose, comments and public templates in English.
 
 ## Cloud runs
 

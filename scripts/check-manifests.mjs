@@ -1,11 +1,11 @@
-// Structural checks of the rendered Kubernetes manifests against contract v6 (docs/CONTRATO.md)
+// Structural checks of the rendered Kubernetes manifests against contract v6 (docs/CONTRACT.md)
 // and the hardening rules of docs/GUARDRAILS.md. Used by the harness check `contract-app`.
 //   node scripts/check-manifests.mjs --params <params.env> local=<file> aws=<file> aws-https=<file> ...
 import { readFileSync } from 'node:fs';
 import { parseAllDocuments } from 'yaml';
 
 const NAMESPACE = 'dx01v2';
-// Kinds the deployer Role of tx01v2 may write (docs/CONTRATO.md). Secrets are written by ESO only.
+// Kinds the deployer Role of tx01v2 may write (docs/CONTRACT.md). Secrets are written by ESO only.
 const DEPLOYER_KINDS = new Set([
   'ConfigMap',
   'Deployment',

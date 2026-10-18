@@ -30,7 +30,7 @@ HARNESS_ONLY="${HARNESS_ONLY:-}"
 IMAGE_TAG="${IMAGE_TAG:-e2e}"
 IMAGES_PREBUILT="${IMAGES_PREBUILT:-0}"
 
-# Pinned schema sources of kubeconform (update procedure: docs/SUSTENTACAO.md).
+# Pinned schema sources of kubeconform (update procedure: docs/MAINTENANCE.md).
 K8S_SCHEMA_KUBERNETES_VERSION="1.36.0"
 K8S_SCHEMA_REF="5f1fa4f7908afc9b6641c62d282a4a22437626e1" # yannh/kubernetes-json-schema
 CRD_SCHEMA_REF="63669a570e231d4f1f8396d229a1de512bcf0a34" # datreeio/CRDs-catalog, 2026-10-08 (ESO 2.12 schemas)
@@ -40,7 +40,7 @@ TEST_POSTGRES_IMAGE="postgres:17-alpine@sha256:b0f9560a2de083e2cc7382e75f808c738
 TRIVYIGNORE_MAX_DAYS=214
 
 REQUIRED_FILES=(
-  README.md README.pt-BR.md AGENTS.md CLAUDE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md LICENSE FORK.md
+  README.md AGENTS.md CLAUDE.md CONTRIBUTING.md SECURITY.md CHANGELOG.md LICENSE FORK.md
   .editorconfig .gitattributes .gitignore .pre-commit-config.yaml Makefile .trivyignore.yaml
   .nvmrc .npmrc .prettierrc .prettierignore eslint.config.js package.json package-lock.json
   .dockerignore api/Dockerfile api/Dockerfile.dockerignore web/Dockerfile web/Dockerfile.dockerignore
@@ -50,8 +50,8 @@ REQUIRED_FILES=(
   .github/ISSUE_TEMPLATE/config.yml .github/ISSUE_TEMPLATE/bug_report.yml .github/ISSUE_TEMPLATE/cloud_run_report.yml
   .github/workflows/ci.yml .github/workflows/deploy-aws.yml .github/workflows/publish-images.yml
   .github/rulesets/main.json sonar-project.properties
-  docs/SUSTENTACAO.md docs/GUARDRAILS.md docs/HARNESS.md docs/CONTRATO.md docs/RUNBOOK.md docs/MIGRATIONS.md
-  docs/ARQUITETURA.md docs/API.md docs/PUBLICACAO.md
+  docs/MAINTENANCE.md docs/GUARDRAILS.md docs/HARNESS.md docs/CONTRACT.md docs/RUNBOOK.md docs/MIGRATIONS.md
+  docs/ARCHITECTURE.md docs/API.md docs/PUBLISHING.md
   tools/versions.env tools/checksums.txt
   scripts/install-tools.sh scripts/update-tool-checksums.sh scripts/harness.sh scripts/repo-guardrails.sh
   scripts/dev-env.sh scripts/compose-smoke.sh scripts/e2e-kind.sh scripts/deploy-aws.sh scripts/render-k8s.sh
@@ -64,7 +64,7 @@ REQUIRED_FILES=(
   scripts/tests/promotion-statements.sh
   scripts/test-zap-gate.sh
   security/dast-baseline.conf
-  docs/SEGURANCA_CI.md
+  docs/CI_SECURITY.md
   security/fixtures/sonar/uncovered.ts
   security/fixtures/sonar/fixture.lcov
   security/fixtures/dast/server.mjs security/fixtures/dast/zap.conf
@@ -232,13 +232,31 @@ check_repo_structure() {
     echo "README.md: more than 250 lines"
     rc=1
   fi
-  forbid 'production-grade|production-ready|enterprise|best-in-class|world-class|battle-tested' "self-ratings in the READMEs" '*' README.md README.pt-BR.md || rc=1
+  forbid 'production-grade|production-ready|enterprise|best-in-class|world-class|battle-tested' "self-ratings in the README" '*' README.md || rc=1
   grep -qF 'not run in the cloud (v2)' README.md || {
     echo "README.md: the status matrix must use the label 'not run in the cloud (v2)'"
     rc=1
   }
-  grep -qF 'não executado em nuvem (v2)' README.pt-BR.md || {
-    echo "README.pt-BR.md: the status matrix must use the label 'não executado em nuvem (v2)'"
+  for status in 'verified in CI' 'verified locally'; do
+    grep -qF "$status" README.md || {
+      echo "README.md: the status matrix must use the evidence label '$status'"
+      rc=1
+    }
+  done
+  if [[ -e README.pt-BR.md ]]; then
+    echo "README.pt-BR.md: maintain the canonical English README.md only"
+    rc=1
+  fi
+  grep -qF 'All public documentation is written in English.' README.md || {
+    echo "README.md: declare the English-only documentation policy"
+    rc=1
+  }
+  grep -qF 'https://github.com/maringelix/tx00v2/blob/main/docs/GETTING_STARTED.md' README.md || {
+    echo "README.md: link the central onboarding guide"
+    rc=1
+  }
+  grep -qi 'English-only' AGENTS.md || {
+    echo "AGENTS.md: retain the English-only documentation rule"
     rc=1
   }
   need git
@@ -463,7 +481,7 @@ check_policy_images() {
   return "$rc"
 }
 
-# Regressions of v1 that must never come back (docs/ARQUITETURA.md, "v1 -> v2").
+# Regressions of v1 that must never come back (docs/ARCHITECTURE.md, "v1 -> v2").
 check_policy_app() {
   local rc=0
   forbid "trust proxy['\"]?[[:space:]]*,[[:space:]]*true" "trust proxy must be a hop count (TRUST_PROXY_HOPS), never true" '*.ts' api/src || rc=1
@@ -584,7 +602,7 @@ check_kubeconform() {
   summary "kubeconform -strict (Kubernetes $K8S_SCHEMA_KUBERNETES_VERSION): $(for o in "${K8S_OVERLAYS[@]}"; do printf '%s: %s; ' "$o" "$(grep -oE '[0-9]+ resources found.*' "$dir/$o.summary")"; done)"
 }
 
-# The contract (docs/CONTRATO.md): manifests and the deploy script use exactly the agreed names.
+# The contract (docs/CONTRACT.md): manifests and the deploy script use exactly the agreed names.
 check_contract_app() {
   local dir="$HARNESS_WORK_DIR/k8s-contract" rc=0 name overlay example
   need kubectl node
@@ -598,12 +616,12 @@ check_contract_app() {
     app/admin-token-secret-name eso/cluster-secret-store dns/enabled dns/domain-name dns/zone-id \
     dns/acm-certificate-arn; do
     grep -qF "\"\$SSM_PREFIX/$name\"" scripts/deploy-aws.sh || {
-      echo "scripts/deploy-aws.sh must read the SSM parameter /tx01v2/lab/$name (docs/CONTRATO.md)"
+      echo "scripts/deploy-aws.sh must read the SSM parameter /tx01v2/lab/$name (docs/CONTRACT.md)"
       rc=1
     }
   done
   grep -qF 'SSM_PREFIX=/tx01v2/lab' scripts/deploy-aws.sh || {
-    echo "scripts/deploy-aws.sh must use the SSM prefix /tx01v2/lab (docs/CONTRATO.md)"
+    echo "scripts/deploy-aws.sh must use the SSM prefix /tx01v2/lab (docs/CONTRACT.md)"
     rc=1
   }
   grep -qF 'https://truststore.pki.rds.amazonaws.com/' scripts/deploy-aws.sh || {

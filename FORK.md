@@ -8,8 +8,8 @@ specific to the app.
 
 What is proven, and how, is in the [status matrix](README.md#status-matrix). In short: the harness,
 the kind e2e and the app on the local platform are `verified in CI`; the AWS deploy of v2 is
-`not run in the cloud (v2)`. Most documents under `docs/` are in Brazilian Portuguese; this page, the
-README, AGENTS.md and CONTRIBUTING.md are in English.
+`not run in the cloud (v2)`. Documentation is maintained in English. Start with the
+[central onboarding guide](https://github.com/maringelix/tx00v2/blob/main/docs/GETTING_STARTED.md).
 
 ## 1-3. The steps both repositories share
 
@@ -42,14 +42,17 @@ make e2e-platform              # the app on the full local platform of tx01v2, t
 
 You need Node.js 24 (`.nvmrc`) and Docker besides the tools of `make tools`; the devcontainer has both.
 `make e2e-platform` clones tx01v2 at the commit of `deploy/local/tx01v2.ref`, builds the whole local
-lab, deploys the app through the git server of the lab and Argo CD, runs 18 probes (the smoke test
+lab, deploys the app through the git server of the lab and Argo CD, runs probes (the smoke test
 over HTTPS through an Istio Gateway, mTLS, metrics, alert rules, the dashboard, logs, one trace from the
 edge to the database, Trivy reports, the HPA, a zero-downtime rollout, a database backup and restore,
 self-heal and two chaos experiments) and always destroys the lab
-([docs/LAB_LOCAL.md](docs/LAB_LOCAL.md)). It needs about 8 GB of memory for Docker, or 7 GB with
+([docs/LOCAL_LAB.md](docs/LOCAL_LAB.md)). It needs about 8 GB of memory for Docker, or 7 GB with
 `LOCAL_SIZE=small make e2e-platform` (the same platform with smaller limits and short retention), and
 takes 25-45 minutes on a laptop (about 20 in CI). With less memory, `make e2e` alone still proves the manifests
 on kind.
+
+Those memory figures describe the historical single-node topology. Current HA CI uses
+`LOCAL_TOPOLOGY=ha`, default size and 12 GiB Docker recommended; small remains single-node.
 
 ## 5. Test the app against your own tx01v2
 
@@ -74,8 +77,11 @@ pointing to the original repositories: change them if you like, nothing depends 
 
 Only after tx01v2 is applied in your account ([its FORK.md](https://github.com/maringelix/tx01v2/blob/main/FORK.md),
 step 7). Its bootstrap prints the repository variables of this fork (`github_variables_dx01v2`:
-`AWS_REGION` and `AWS_DEPLOY_ROLE_ARN`); then run `deploy-aws` from the Actions tab and approve the
-`lab` environment. The workflow builds and pushes the images, publishes the GitOps revision, waits
+`AWS_REGION` and `AWS_DEPLOY_ROLE_ARN`). Wait for successful push CI on current `main`, dispatch
+`publish-images.yml` with that `ci_run_id`, then `deploy-aws.yml` with the successful publication's
+`release_run_id`, matching `platform_profile=core|full`, `deploy_mode=auto` and `target=primary`.
+Approve `lab` after release verification. The workflow promotes tested images without rebuilding,
+signs final ECR promotion, publishes the GitOps revision when Argo CD exists, waits
 for Argo CD and runs the smoke test through the load balancer: [docs/RUNBOOK.md](docs/RUNBOOK.md),
 sections 5 to 9. Destroy the lab from tx01v2 on the same day.
 
@@ -106,6 +112,8 @@ Pull requests to the original repository are welcome: see [CONTRIBUTING.md](CONT
 change to `api/`, `web/` or `e2e/` has to reach the three app repositories (the parity rule of
 AGENTS.md). Workflow runs from forks wait for the maintainer's approval, and the same harness decides.
 
-## R10: capacidade e FinOps
+## R10: capacity and FinOps
 
-Veja [Capacidade e SLO](docs/FINOPS.md) para carga limitada, HPA up/down, PDB/drain, rightsizing, pool PostgreSQL e showback. Prova Docker em Actions; nada executado na nuvem (v2).
+See [Capacity and SLO](docs/FINOPS.md) for bounded load, HPA scale-up/down, PDB/drain,
+rightsizing, PostgreSQL pooling and showback. Docker evidence runs in Actions;
+not run in the cloud (v2).

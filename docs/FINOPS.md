@@ -1,61 +1,57 @@
-# R10 — capacidade, SLO e rightsizing do app
+# R10 — app capacity, SLO and rightsizing
 
-Construção para fork; nenhuma execução AWS (v2).
-O workflow completo usa o tx01v2 fixado em deploy/local/tx01v2.ref.
-O cenário small permanece num nó/7 GiB; o cenário de capacidade usa LOCAL_TOPOLOGY=ha,
-LOCAL_FINOPS=1 e recomenda 12 GiB disponíveis no Docker. Rodadas pesadas ficam no Actions.
+Construction for forks; `not run in the cloud (v2)`. The complete workflow uses tx01v2 pinned in
+`deploy/local/tx01v2.ref`. Small remains one node/7 GiB; capacity uses `LOCAL_TOPOLOGY=ha` and
+`LOCAL_FINOPS=1` with 12 GiB available to Docker recommended. Heavy runs belong in Actions.
 
-## Aula e evidência
+## Exercise and evidence
 
-O CI e2e-platform executa scripts/capacity-app.sh após as sondas anteriores.
-Em Linux/devcontainer com recursos disponíveis:
+CI `e2e-platform` executes `scripts/capacity-app.sh` after the previous probes.
+On Linux/devcontainer with sufficient resources:
 
-    LOCAL_TOPOLOGY=ha LOCAL_FINOPS=1 make e2e-platform
+```bash
+LOCAL_TOPOLOGY=ha LOCAL_FINOPS=1 make e2e-platform
+```
 
-O teste aceita somente o kubeconfig kind-tx01v2-local. Mede requisições HTTPS reais
-a /api/messages pelo Gateway com CA validada, sem gravar nem expor credenciais.
-Cada fase tem concorrência e duração limitadas, deadline do pod e limpeza.
+The test accepts only the `kind-tx01v2-local` kubeconfig. It measures actual HTTPS requests to
+`/api/messages` through the Gateway with a verified CA, without persisting/exposing credentials.
+Every phase has bounded concurrency/duration, a Pod deadline and cleanup.
 
-1. Mede baseline com 4 clientes por 30 segundos (sucesso >=99%, p99 <=1,5 s).
-2. Injeta StressChaos de CPU, com limites de CPU de 500m no API, junto da carga HTTP.
-   Exige HPA chegar a quatro réplicas prontas.
-3. Drena somente os pods API de um worker pertencente ao kind. PDB, readiness e
-   RollingUpdate continuam ativos; o cliente mantém o mesmo SLO durante o ensaio.
-4. Remove o stress, experimenta requests CPU 100m → 50m e exige scale-down para dois.
-   Repete a mesma carga/SLO e registra requests agregados antes/depois.
-5. Faz um lock de tabela PostgreSQL por 10 s: pelo menos dez conexões API bloqueadas,
-   pool saturado e erros visíveis ao cliente. Ao soltar o lock, exige recuperação
-   e repete o SLO. Mais pods não consertam um gargalo no banco.
-6. Exige recomendação VPA com updateMode Off; uma quota rejeita um pod caro por
-   exceder CPU. O JSON de evidência contém contagens/latência, sem corpos/respostas.
+1. Measure a baseline with four clients for 30 seconds: success >=99%, p99 <=1.5 s.
+2. Inject CPU StressChaos with an API CPU limit of 500m alongside HTTP load. Require four ready HPA replicas.
+3. Drain only API Pods from a kind-owned worker. PDB, readiness and RollingUpdate stay active; the
+   client must maintain the same SLO throughout the exercise.
+4. Remove stress and require scale-down to two replicas. Trial CPU requests of 100m → 50m, rerun the
+   same load/SLO and record actual replica counts and aggregate requests before/after.
+5. Lock the PostgreSQL table for 10 seconds: require at least ten blocked API connections, pool
+   saturation and visible client errors. On release, require recovery and repeat the SLO. More app
+   replicas cannot fix a database bottleneck.
+6. Require a VPA recommendation with `updateMode=Off`; quota must reject an expensive Pod exceeding
+   CPU allowance. Evidence JSON contains counts/latency, never response bodies.
 
-O controlador Argo CD é pausado durante o experimento imperativo. O trap restaura
-requests, HPA e o número original de réplicas do controlador, inclusive em falhas.
-Os manifests GitOps continuam a fonte de configuração permanente. O HPA normal
-tem janelas de estabilização; somente o teste usa scale-down curto.
+The Argo CD controller pauses during this imperative experiment. A trap restores requests, HPA and
+the controller's original replica count, including on failure. GitOps manifests remain the permanent
+configuration source. Normal HPA uses stabilization windows; only the test shortens scale-down.
 
-## Showback e interpretação
+## Showback and interpretation
 
-Todo template de pod da aplicação exige cost.lab/owner e cost.lab/environment;
-o check contract-app falha se qualquer label faltar. Ajuste owner no kustomize
-para o responsável da aula. OpenCost e Grafana são instalados pelo tx01v2:
-consulte a aula de [FinOps da infraestrutura](https://github.com/maringelix/tx01v2/blob/main/docs/FINOPS.md)
-para /allocation, idle/shared, fontes/data/moeda/região e serviços fora dos pods.
+Every app Pod template requires `cost.lab/owner` and `cost.lab/environment`; `contract-app` fails if
+either label is absent. Set owner in Kustomize to the exercise owner. tx01v2 installs OpenCost and
+Grafana; see the [infrastructure FinOps exercise](https://github.com/maringelix/tx01v2/blob/main/docs/FINOPS.md)
+for allocation, idle/shared costs, source/date/currency/region and services outside Pods.
 
-Reduzir requests não garante economia: o HPA pode pedir mais réplicas. Compare
-requests agregados, uso medido, latência, erros e alocação para a mesma carga.
-O candidato de 50m é um ensaio, restaurado ao terminar; não muda a configuração
-de produção automaticamente. VPA Off não compete com HPA sobre requests.
+Lower requests do not guarantee savings: HPA may create more replicas. Compare aggregate requests,
+measured use, latency, errors and allocation for the same load. The 50m candidate is an experiment
+restored on exit; it never changes the permanent app configuration automatically.
+VPA Off does not compete with HPA by mutating requests.
 
-## AWS e limpeza
+## AWS and cleanup
 
-EKS usa Cluster Autoscaler com Pod Identity; a aula Spot do tx01v2 usa
-tarefa descartável com deadline/fallback on-demand explícito, preservando o app
-crítico. Aumentar réplicas no kind não comprova escala gerenciada ou preço da AWS.
-Use o gate de estimativa, budget e expiração do tx01v2 antes de qualquer apply;
-não trate OpenCost como fatura nem budget como teto de cobrança.
+EKS uses Cluster Autoscaler with Pod Identity. The tx01v2 Spot lesson runs a disposable task with a
+deadline and explicit on-demand fallback while preserving the critical app. More kind replicas do
+not prove managed scaling or AWS prices. Use tx01v2's estimate, budget and expiration gate before
+any apply. OpenCost is not an invoice, and a budget is not a billing ceiling.
 
-Em falha, examine capacity-app.json, eventos, HPA/PDB/VPA, metrics-server,
-pool/conexões e logs do Gateway. O teardown do e2e sempre destrói os recursos que
-esse estado criou e verifica sobras. A limpeza cloud usa o runbook do par e só
-deve ocorrer na rodada autorizada.
+On failure, inspect `capacity-app.json`, events, HPA/PDB/VPA, metrics-server, database pooling/
+connections and Gateway logs. E2e teardown always destroys resources owned by its state and checks
+leftovers. Cloud cleanup follows the pair's runbook and requires an authorized cloud run.
