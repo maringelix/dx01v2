@@ -81,7 +81,7 @@ for the request and in the `requestId` field of errors.
 |---|---|---|
 | `APP_ENV` | `local` | `local`, `ci`, `kind` or `lab` |
 | `PORT` / `METRICS_PORT` | `3000` / `9464` | Must differ |
-| `TRUST_PROXY_HOPS` | `0` | Number of proxies in front of the API: 1 in Compose, kind and AWS; never `true` |
+| `TRUST_PROXY_HOPS` | `0` | Configured trusted-hop count: 1 in Compose, kind and AWS; never `true`; see the AWS attribution limit below |
 | `LOG_LEVEL` | `info` | `fatal`, `error`, `warn`, `info`, `debug`, `trace`, `silent` |
 | `DB_HOST`, `DB_NAME`, `DB_USER`, `DB_PASSWORD` | — | Required (`db-credentials` Secret) |
 | `DB_PORT` | `5432` | |
