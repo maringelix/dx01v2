@@ -18,6 +18,11 @@ and its maintenance guide.
 - Current contract is version 7/R9 (2026-10-17), with regional runtime and db/endpoint; v3 pinned immutable OIDC and v2 added Collector OTLP.
 
 - Scanner exceptions: none in the recorded baseline (.trivyignore.yaml empty).
+- Open Dependabot advisory (2026-11-09): GHSA-g3hv-75wg-m249 (medium, pattern amplification) in
+  minimatch 10.2.6, a development dependency of eslint, @eslint/config-array and
+  @typescript-eslint/typescript-estree; it is not in the images. The fix exists only in minimatch
+  11.0.1, which those packages do not accept yet, and an `overrides` entry would put an untested
+  major under eslint. Re-check at the next monthly Dependabot round.
 
 ## 3. Routines
 
