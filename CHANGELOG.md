@@ -25,7 +25,7 @@ All notable changes to this project are documented here. The format follows
     ranges until the migration is done by hand in the three apps.
   - CodeQL Action `init`/`analyze` pinned to the v4.39.3 commit (the old pin was the tag object
     of v4.39.0, not its commit).
-  - `deploy/local/tx01v2.ref` pins the merged tx01v2 round commit.
+  - `deploy/local/tx01v2.ref` pins tx01v2#24 (`133ca9b`), the merged tx01v2 round commit.
 
 - Standardize documentation, historical evidence, templates and instructions in English; rename
   document paths and use one README linked to the central onboarding guide. Refresh AWS
